@@ -21,10 +21,10 @@ These initial populations can be created with the scripts:
 
 Basic usage of the "DefineInitialState" scripts from Jay et al. 2022:
 >slim -d N=1000 -d s=-0.01 -d h=0.1 -d r=1e-08 -d mu=1.45e-8 ScriptNeutralInversion_DefineInitialState_XY.slim #Perform a single simulation  
-parallel -j10 slim -d N=1000 -d mu=1e-8 -d h={1} -d s={2} -d r=1e-6 ScriptNeutralInversion_DefineInitialState_XY.slim ::: 0 0.001 0.005 0.01 0.05 0.1 0.5 ::: -0.001 -0.005 -0.01 -0.05 -0.1 -0.6 #Perform multiple simulation in parallel on 10 cores with different *s* and *h*  
+>parallel -j10 slim -d N=1000 -d mu=1e-8 -d h={1} -d s={2} -d r=1e-6 ScriptNeutralInversion_DefineInitialState_XY.slim ::: 0 0.001 0.005 0.01 0.05 0.1 0.5 ::: -0.001 -0.005 -0.01 -0.05 -0.1 -0.6 #Perform multiple simulation in parallel on 10 cores with different *s* and *h*  
 
 Basic usage of the new "DefineInitialState" scripts:
-slim -d N=12500 -d s=-0.001 ScriptNeutralInversion_DefineInitialStateSexChrom_NoFullRecess.slim
+>slim -d N=12500 -d s=-0.001 ScriptNeutralInversion_DefineInitialStateSexChrom_NoFullRecess.slim
 
 
 *mu* define the mutation rate, *r* the recombination rate, *s* the selection coefficient (fixed or the mean of the gamma distribution), *h* the dominance coefficient, *N* the population size
@@ -33,7 +33,7 @@ This writes the initial populations in a ../InitialState directory (must be crea
 
 ## Introduce inversions
 Then, we introduce in these initial populations 1000's of inversions or other recombination modifiers. To do so, use the scripts:
- - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_ModForSlim4.3.slim #Basic simulation (Figures 3, S2-3, S10-13 ); From Jay et al. 2022
+ - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_ModForSlim4.3.slim #Basic simulation (Figures 2, 3, S2-3, S10-13 ); From Jay et al. 2022
  - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_SingleChrom_HaploDiplo.slim #Simulation with HaploDiplontic life cycle (Figures S22-23); From Jay et al. 2022
  - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_Variablesh.slim #Simulation with mutation of variable h and s (drawn from distribution, Figure S17); From Jay et al. 2022
  - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_ChromFus.slim #Simulation of chromosome fusion (Figure S18); From Jay et al. 2022
@@ -61,7 +61,7 @@ This produces output in ../Output (must be created) such as N=1000_Inv=4000001-6
 For plotting, concatenate the output
  > cat N=1000_*_IndivPlot.txt > InversionTrajectories_N=1000.txt #Can be plotted with the R script to produce figure 3.
 	
-# Analyses of the formation of sex chromosomes (Figures 4-5 and S24):
+# Analyses of the formation of sex chromosomes (Figures 5-6 and S24):
 In this case, just run the script ScriptFormationXYChromosome_VarGamma_OnlyXY_Revers_Optimized.slim with parameters. For instance:
 
  > slim -d N=10000 -d mu=1e-09 -d s=-0.03 -d r=1e-06 -d rep=5 -d N_BP=10000 -d InvR=0.00000001 -d MaxSizeInv=20000000 ScriptFormationXYChromosome_VarGamma_OnlyXY_Revers_Optimized.slim # N_BP is the number of breakpoint in the genome, InvR is the inversion rate, MaxSizeInv is the maximum inversion size. 
