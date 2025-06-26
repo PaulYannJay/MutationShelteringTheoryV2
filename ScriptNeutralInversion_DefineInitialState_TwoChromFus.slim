@@ -1,0 +1,88 @@
+// set up a simple neutral simulation
+initialize() {
+	// set the overall mutation rate
+	initializeMutationRate(mu);
+	// m1 mutation type: neutral
+	initializeMutationType("m1", h, "f", s);
+	initializeMutationType("m2", 0.5, "f", 0);// mutation defining mating type locus 1
+
+	// g1 genomic element type: uses m1 for all mutations
+	initializeGenomicElementType("g1", m1, 1.0);
+
+	// uniform chromosome of length 2000 kb for two chromosome
+	initializeGenomicElement(g1, 0,19999999);
+
+
+	// uniform recombination along two chromosomes
+	rates=c(r, 0.5, r);//Two chromosomes with R=1e-8	
+    ends=c(9999999,10000000,19999999); //Two chromosome of size 1000000	
+	initializeRecombinationRate(rates, ends);
+	initializeSex("A");
+	defineConstant("start", clock());
+}
+// create a population of 500 individuals
+1 late(){
+	sim.addSubpop("p1", N);
+	defineConstant("simID", getSeed());
+	i = p1.individuals;
+	i[i.sex == "M"].genome2.addNewDrawnMutation(m2, 5000000);
+}
+
+2:15000	modifyChild(p1) { //simulating the meeting between two gamete and fecondation depand on their genotype
+	numY = sum(child.genomes.containsMarkerMutation(m2, 5000000));
+	// no individual should have more than one Y
+	if (numY > 1)
+		stop("### ERROR: got too many Ys");
+	// females should have 0 Y's
+	if (child.sex == "F" & numY > 0)
+		return F;
+	// males should have 1 Y
+	if (child.sex == "M" & numY == 0)
+		return F;
+	return T;
+}
+
+1:15000 late(){
+	if (sim.generation % 100 == 0)
+		{
+		Genomes=p1.genomes; // All genomes
+		NMutVec=c();
+		NMutVec_AroundMT=c();
+		for (g in Genomes) {
+			NbMut=g.countOfMutationsOfType(m1);
+			NMutVec=c(NMutVec, NbMut);
+			}
+		meanNbMut=mean(NMutVec); //mean number of mutations in genomes
+		mut1 = sim.mutationsOfType(m1);
+		Nmut1= sim.countOfMutationsOfType(m1); //Total number of mutations
+		Freq1=sim.mutationFrequencies(NULL, mut1); 
+		MeanFreq1=mean(Freq1); //mean frequency of mutations
+		MutXY=mut1[(mut1.position >= 4975000) & (mut1.position < 5250000)];
+		NbMutXY=size(MutXY);
+		FreqMutXY=mean(sim.mutationFrequencies(NULL, MutXY));
+		line=paste(c(N,"\t", mu,"\t",r,"\t",h,"\t",s,"\t",sim.generation,"\t", meanNbMut,"\t", Nmut1, "\t", MeanFreq1, "\t", NbMutXY, "\t", FreqMutXY)); //output the frequency of a given mutation
+		writeFile(paste(c("../InitialState/slim_g15000_MidSDR_10MChrom_XY_N=" , N , "_r=" , r , "_u=" , mu , "_s=" , s , "_h=" , h , "_" , simID , "_ChromFus_Stat.txt"), sep=""), line, append=T);
+		}	
+}
+
+15000 late() {
+sim.outputFull("../InitialState/slim_g15000_MidSDR_10MChrom_XY_N=" + N + "_r=" + r + "_u=" + mu + "_s=" + s + "_h=" + h + "_" + simID + "_ChromFus.txt");
+line=paste(c(N , r , mu , s , h , sim.generation, "XY", simID, (clock() - start)));
+writeFile("../Output/RunningTime.txt", line, append=T);
+sim.simulationFinished();
+}
+
+recombination() { //Define special recombination pattern depending on mutation (inversion) presence
+	if (genome1.containsMarkerMutation(m2, 500000) == genome2.containsMarkerMutation(m2, 500000)) //if the individuals is XX
+		{return F;} //Nothing happens
+	else //individuals XY
+		{ 
+		inInv = (breakpoints > 1000000) & (breakpoints < 9000000); // No recombination between position 1-9 Mb (simulate old sex chromosome with small PAR)
+		if (!any(inInv)) //If no recombination breakpoint fall in the inversion breakpoint, 
+			{return F;} // Nothing happens
+		else 
+			{breakpoints = breakpoints[!inInv]; //If not, this recombination can't occur
+			return T;
+			}
+		}
+	}

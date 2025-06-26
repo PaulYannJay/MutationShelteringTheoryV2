@@ -1,0 +1,468 @@
+// set up a simple neutral simulation
+initialize() {
+	// set the overall mutation rate
+	initializeMutationRate(mu);
+	// m1 mutation type: neutral
+	initializeMutationType("m10", 0, "g", s, 0.2); // 6 types of mutations with various dominance coefficient and fitness effect sampled among a gamma dsitribution
+	initializeMutationType("m11", 0.001, "g", s, 0.2);
+	initializeMutationType("m12", 0.01, "g", s, 0.2);
+	initializeMutationType("m13", 0.1, "g", s, 0.2);
+	initializeMutationType("m14", 0.25, "g",s , 0.2);
+	initializeMutationType("m15", 0.5, "g", s, 0.2);
+	initializeMutationType("m2", 0.5, "f", 0);// mutation defining mating type locus 1
+	initializeMutationType("m40", 0.5, "f", 0);// mutation defining inversion breakpoint 1
+	initializeMutationType("m41", 0.5, "f", 0);// mutation defining inversion middle 
+	initializeMutationType("m42", 0.5, "f", 0);// mutation defining inversion breakpoint 2 
+	m41.convertToSubstitution = F; //Keep track of the inversions after their fixation
+	m42.convertToSubstitution = F;
+	m40.convertToSubstitution = F;
+	// g1 genomic element type: uses m1 for all mutations
+	initializeGenomicElementType("g1", c(m10,m11,m12,m13,m14,m15),c(1,1,1,1,1,1)); //mutation with different dominance appear with equal probability
+	//initializeGenomicElementType("g2", c(m10,m11,m12,m13,m14,m15),c(1,1,1,1,1,1)); //mutation with different dominance appear with equal probability
+	defineConstant("InvRate", InvR); // Inversion rate
+	defineConstant("C", N_BP);//number of breakpoint (constant)
+	PotentTarget=N_BP*N; //Number of breakpoint potential in the population (in all individual, so depend on population size)
+	defineConstant("Target", PotentTarget);//number of breakpoint
+	GenomeSize=200000000; // the size of the genome
+	defineConstant("GS", GenomeSize); //Define genome size constant
+	InvBP=sort(rdunif(C, 1, GenomeSize-1)); //Define the random position of the breakpoint
+	defineConstant("BP", InvBP);
+	defineConstant("BP1", BP[(BP-(GS/2) < 0)]);//Breakpoint on Chromosome 1
+	defineConstant("BP2", BP[(BP-(GS/2) > 0)]); // BP on chromosome 2
+	pos=0;
+	initializeGenomicElement(g1, 0, GenomeSize-1);
+	// uniform recombination along two chromosomes
+	rates=c(r, 0.5, r);//Two chromosomes	
+    ends=c(asInteger((GS/2)-1), asInteger(GS/2), asInteger(GenomeSize-1)); //Two chromosome of equal size	
+	initializeRecombinationRate(rates, ends);
+	initializeSex("A");
+	defineConstant("InvArray",matrix(c(1,1,1,1,1), nrow=1)); //Define an array to store inversion position and frequency
+	defineConstant("simID", getSeed()); //Simulation seed
+	defineConstant("file", paste(c("../Output/N=",N,"_u=",mu, "_r=",r,"_mean_s=", s,"_MaxSizeInv=",MaxSizeInv, "_InvRate=",InvR,"_N-BP=", N_BP, "_Rep_", rep,"_ID=",simID, "_InvFreq_IndivSimulation_OnlyXY_NbMut_Optim.txt"), sep="")); //File to store inversion frequency and position
+	defineConstant("fileRec", paste(c("../Output/N=",N,"_u=",mu, "_r=",r,"_mean_s=", s,"_MaxSizeInv=",MaxSizeInv, "_InvRate=",InvR,"_N-BP=", N_BP, "_Rep_", rep,"_ID=",simID, "_NRecomb_IndivSimulation_OnlyXY_Optim.txt"), sep=""));//File to store Recombination occuring
+	defineConstant("fileRevers", paste(c("../Output/N=",N,"_u=",mu, "_r=",r,"_mean_s=", s,"_MaxSizeInv=",MaxSizeInv, "_InvRate=",InvR,"_N-BP=", N_BP, "_Rep_", rep,"_ID=",simID, "_Reversion_IndivSimulation_OnlyXY_NbMut_Optim.txt"), sep=""));//File to indicate when reversion occurs 
+	defineConstant("fileBlockRevers", paste(c("../Output/N=",N,"_u=",mu, "_r=",r,"_mean_s=", s,"_MaxSizeInv=",MaxSizeInv, "_InvRate=",InvR,"_N-BP=", N_BP, "_Rep_", rep,"_ID=",simID, "_BlockedReversion_IndivSimulation_OnlyXY_NbMut_Optim.txt"), sep=""));//File to indicate when a reversion was blocked 
+	defineConstant("fileNewInv", paste(c("../Output/N=",N,"_u=",mu, "_r=",r,"_mean_s=", s,"_MaxSizeInv=",MaxSizeInv, "_InvRate=",InvR,"_N-BP=", N_BP, "_Rep_", rep,"_ID=",simID, "_NewInv_Optim.txt"), sep=""));//File to store the position of every inversion that have appeared
+	}
+
+// create a population of N individuals
+1 late(){
+	sim.addSubpop("p1", N);
+	i = p1.individuals;
+	i[i.sex == "M"].genome2.addNewDrawnMutation(m2, asInteger(GS/4));
+	}
+
+2:115000	modifyChild(p1) { //simulating the meeting between two gamete and fecondation depand on their genotype
+	numY = sum(child.genomes.containsMarkerMutation(m2, asInteger(GS/4)));
+	// no individual should have more than one Y
+	if (numY > 1)
+		stop("### ERROR: got too many Ys");
+	// females should have 0 Y's
+	if (child.sex == "F" & numY > 0)
+		return F;
+	// males should have 1 Y
+	if (child.sex == "M" & numY == 0)
+		return F;
+	return T;
+}
+
+ 10000 late() {
+sim.outputFull("../InitialState/slim_g15000_MidSDR_100MChrom_Revers_N=" + N + "_r=" + r + "_u=" + mu + "_Lambs=" + s  + "_MaxSizeInv=" + MaxSizeInv +  "_InvRate=" + InvR + "_N-BP=" +  N_BP +  "_Rep_" +  rep+ "_" + simID + "Gen=" + sim.generation + ".txt");
+} //Store population state after burn in
+
+10000:115000 early() { //introducing inversion every generation 
+	if (sim.generation % 100 == 0) //every n generation
+	{
+		print(sim.generation); //print the generation
+	}
+	if (sim.generation % 20000 == 0) //every n generation
+		{
+  		sim.outputFull("../InitialState/slim_g15000_MidSDR_100MChrom_Revers_N=" + N + "_r=" + r + "_u=" + mu + "_Lambs=" + s  + "_MaxSizeInv=" + MaxSizeInv +  "_InvRate=" + InvR + "_N-BP=" +  N_BP +  "_Rep_" +  rep+ "_" + simID + "Gen=" + sim.generation + ".txt"); //store population state, in case something bad happens (eg, cluster crash...)
+		}
+	Array=InvArray;//Copy into an array the array containing inversion	
+	AverageNumberEvent=	Target * InvRate; //Average Number of inversion introduced each generation
+	Numberevent=rpois(1, AverageNumberEvent); //Sample number of inversion introduced this generation (sampled from a poisson distribution) // For each inversion, first sample its first breakpoint and then its second
+	InvBP=sample(BP, Numberevent, replace=T); //Sample the first Breakpoints of these inversions
+	for (InvBP1 in InvBP) //For every inversions
+		{
+		//Here, Define the new inversion characteristics --> Sample a second inversion breakpoint among the possible (on the same chromosome)
+		if (InvBP1 < GS/2){  // Here check whether the inversion is on the first chromosome
+			PotentialEndBP=BP1;} // If yes, only retain the potential other breakpoint that are on the same chromosome
+		else { 
+			PotentialEndBP=BP2;} // If not, breakpoint on the second chromosome
+		PotentialEndBP=setDifference(PotentialEndBP, InvBP1);//Do not allow the second breakpoint to be the same as the first one.
+		PotentialEndBP=PotentialEndBP[abs(PotentialEndBP - InvBP1) < MaxSizeInv]; //Only consider the potential second breakpoint that are not too far
+		if (size(PotentialEndBP)==0) //If their is no potential second breakpoint, just do nothing
+			{
+			//stop("WARNING : The Maximum inversion size defined is probably too small, no breakpoint can be found within this limit");
+			;//do nothing
+			}
+		else
+			{
+			InvBP2=sample(PotentialEndBP, 1); // Sample the second breakpoint
+			InvStart=min(InvBP1,InvBP2); // Get the breakpoint on the 3' side
+			InvEnd=max(InvBP1,InvBP2); // 5' side
+			InvMiddle=integerDiv(InvStart+InvEnd, 2); //Used to define position markers of inversions. Two different inversions can have the same start or end breakpoint, but should not have the same middle
+			//Here, conditionnaly introduce the inversion/reversion
+			SampleGen=sample(p1.genomes, 1); //Sample the genome affected by this inversion
+			if (SampleGen.containsMarkerMutation(m41,InvMiddle)) //Check if this genome ever has a inversion at this position
+				{ //If yes (//An inversion ever exist a this position)
+				SampleInv=c(SampleGen.mutationsOfType(m42).position, SampleGen.mutationsOfType(m40).position); //Position of all inversion breakpoints in this sample // Used to check if their is another inversion overlapping with this one.
+				if (sum((SampleInv>InvStart) & ( SampleInv<InvEnd))==0) // If no other breakpoint are found in the inversion interval, then the inversion of the inversion will result in a reversion : suppression of the inversion
+					{ //Remove the inversion (middle, start, end). Note that because inversion mutations can stack, a breakpoint position can contain several inversion mutation marker. For instance, the same position can be the end of two inversions that start at different positions. This position thus have two "m42" mutations. If we remove one mutation from this position, this position will still be considered to be the breakpoint of an inversion  because it should still include one "m42" mutations. 
+					writeFile(fileRevers, paste(sim.generation + "\t" + InvStart + "\t" + InvEnd), append=T); // Write in the reversion file
+					mutation=SampleGen.containsMarkerMutation(m41,InvMiddle, returnMutation=T);//The mutation to remove: middle
+					SampleGen.removeMutations(mutation);//Remove the mutation ---> inversion reversion
+					mutation=SampleGen.containsMarkerMutation(m40,InvStart, returnMutation=T);//The mutation to remove; Start
+					SampleGen.removeMutations(mutation);//Remove the mutation ---> inversion reversion
+					mutation=SampleGen.containsMarkerMutation(m42,InvEnd, returnMutation=T);//The mutation to remove: End
+					SampleGen.removeMutations(mutation);//Remove the mutation ---> inversion reversion
+					}
+				else // The inversion overlap with other inversions. No reversion can occur
+					{
+					BlockBP=SampleInv[(SampleInv>InvStart) & ( SampleInv<InvEnd)];
+					catn("Blocked");
+					writeFile(fileBlockRevers, paste(sim.generation + "\t" + InvStart + "\t" + InvEnd + "\t" + paste(BlockBP)), append=T); //Write in the blocked reversion file
+					}
+				// if the the individual ever have an inversion at this position, but this inversion overlap with other (such as there is inversion with end or start breakpoint within this one), we consider this new inversion cannot appears and nothing happens (in reality, this reversion could maybe occurs but will result in a complex resuffling of gene order and is not expected to restaure recombination)
+				}
+			else 
+				{ //This sample has no inversion at this position: introduce one
+				SampleGen.addNewDrawnMutation(m40, InvStart); //introduce a new inversion marker: BP 1
+				SampleGen.addNewDrawnMutation(m41, InvMiddle); //introduce a new inversion marker: Middle
+				TagMut=SampleGen.containsMarkerMutation(m41,InvMiddle, returnMutation=T).id; //return the mutation, to tag it
+				SampleGen.addNewDrawnMutation(m42, InvEnd); //introduce a new inversion marker: BP 2
+				posMut10 = SampleGen.mutationsOfType(m10).position; //Position of mutations of the new sample with the new inversion
+				posMut11 = SampleGen.mutationsOfType(m11).position; //Position of mutations of the new sample with the new inversion
+				posMut12 = SampleGen.mutationsOfType(m12).position; //Position of mutations of the new sample with the new inversion
+				posMut13 = SampleGen.mutationsOfType(m13).position; //Position of mutations of the new sample with the new inversion
+				posMut14 = SampleGen.mutationsOfType(m14).position; //Position of mutations of the new sample with the new inversion
+				posMut15 = SampleGen.mutationsOfType(m15).position; //Position of mutations of the new sample with the new inversion
+				posMut=c(posMut10,posMut11,posMut12,posMut13,posMut14,posMut15); //position of all inversions
+				NbMutInv=sum((posMut >= InvStart) & (posMut < InvEnd)); //nb of mutations in inversion
+				Array=rbind(Array,c(TagMut, InvStart, InvEnd, NbMutInv, InvMiddle));//Push the new inversion into the inversion arrays
+				writeFile(fileNewInv, paste(sim.generation + "\t" + InvStart + "\t" + InvEnd), append=T); //Write in the inversion file
+				}
+			}
+		}
+	// End of the introduction of the inversion
+	//Here, edit the inversion array to suppress inversion that have been lost // Every generation
+	MatBool=c(); //Vector to define lost and non-lost inversion
+	if (size(Array)>0) //if they are inversion segregating in the pop
+		{
+		for (Inv in 0:(nrow(Array)-1)) //for each inversion 
+			{
+			InvID=drop(Array[Inv,0]); //Get its position 
+			F_Inv = sum(p1.individuals.genomes.mutationsOfType(m41).id == InvID); //function to grep the number of genomes with the inversion mutation. 
+			if( F_Inv == 0) //If nobody harbor the inversion (All sample are homozygous without
+				{
+				MatBool=c(MatBool,F); //Write in the Boolean vector F
+				}
+			else
+				{
+				MatBool=c(MatBool,T);//Write in the Boolean vector T
+				}
+			}
+		Array=Array[MatBool,]; //edit array to suppress Lost inversion
+		rm("InvArray",removeConstants=T); // Suppress the Constant Inversion array
+		defineConstant("InvArray",Array); //replace it by the new array
+		}
+	//Here, calculate stat on inversion for plotting	
+	if (sim.generation % 100 == 0) //every n generation 
+		{
+		writeFile(file, paste("Generation:\t" + sim.generation), append=T);
+		if (size(Array)>0)
+			{
+			for (Inv in 0:(nrow(Array)-1)) //for each inversion 
+				{
+				InvID=drop(Array[Inv,0]); //Get its position 
+				InvStart=drop(Array[Inv,1]);
+				InvEnd=drop(Array[Inv,2]); 
+				NbMut=drop(Array[Inv,3]);
+				pScr = "size(applyValue.genomes.mutationsOfType(m41)[applyValue.genomes.mutationsOfType(m41).id == InvID]);"; //function to get the genotype of all samples at the inversion mutation. Modified version to differentiate two inversions at the exact same position in different individual
+				p = sapply(p1.individuals, pScr); //apply the function
+				p__ = sum(p == 0); //Indiv with no Inversion
+				pI_ = sum(p == 1); //hetero
+				pII = sum(p == 2); //Homo
+				p1GenYBool = p1.individuals.genomes.containsMarkerMutation(m2, asInteger(GS/4));//Boolean to determine the sex chromosome type (X or Y)
+				p1GenY = p1.individuals.genomes[p1GenYBool]; //YChrom
+				p1GenX = p1.individuals.genomes[!p1GenYBool];//Xchrom
+				p1GenY_WithInv=sum(p1GenY.mutationsOfType(m41).id == InvID); //Number of Ychrom with the inversion
+				p1GenX_WithInv=sum(p1GenX.mutationsOfType(m41).id == InvID); //Number of Xchrom with the inversion
+				//Calculate stat on inversions
+				Fct="(sum(applyValue.mutationsOfType(m41).id == InvID) == 1);";//function to give the number of inversion marker in each genome. 0-> no inversion, 1-> inversion (Do a similar thing as "containMarkerMutation" but check also the ID of the mutation 
+				BoolGenInv=sapply(p1.genomes, Fct);
+				genomeWInv=p1.genomes[BoolGenInv]; // genome with inversion
+				genomeNoInv=p1.genomes[!BoolGenInv];//genome without inversion
+				NumberOfMut="sum((applyValue.mutations.position > InvStart) & (applyValue.mutations.position < InvEnd) & (match(applyValue.mutations.mutationType, c(m10,m11,m12,m13,m14,m15)) >= 0));"; //Function to calculate the number of mutation within the inversion for each genome
+				meanMutInv=mean(sapply(genomeWInv, NumberOfMut)); //mean number of mutation in inverted segment
+				if (size(genomeWInv) != 2*N){
+					meanMutNoInv=mean(sapply(genomeNoInv, NumberOfMut));}  //If the inversion is not fixed, calculate the number of mutation in non inverted segment
+				else {
+					meanMutNoInv=0;}
+				writeFile(file, paste(InvStart + "\t" + InvEnd +"\t" +  NbMut +"\t" + p__ +"\t" + pI_ +"\t" + pII +"\t" + p1GenY_WithInv +"\t" + p1GenX_WithInv +"\t" + meanMutInv +"\t" + meanMutNoInv), append=T); //Write in the main file
+				}
+			}
+		}
+	}
+
+2:115000 late() { 
+	if (sim.generation % 1000 == 0) //every 30 generation
+		{
+		writeFile(fileRec, paste("Generation:\t" + sim.generation), append=T); //Just write generation in the recombination file
+		}
+	}
+
+// run to generation 115000
+115000 late() {
+sim.simulationFinished();
+}
+
+recombination() { //Define special recombination pattern depending on mutation (inversion) presence
+	Bool=0; // Used to check if something happens (Recombination event suppressed or not)
+	if(size(InvArray)>0) //if there are inversions segregating
+	{
+	for (pos in unique(InvArray[,4])) // For all position where there is an Inversion (and not, as above, for all inversions, since two inversions at the exact same place have the same effect on recombination)
+		{
+		if (size(breakpoints)>1) // If this sample experimented a recombination somewhere (Used to check if there is still some recombination event --> all recombination may have been suppressed by previous inversion)
+			{
+			Array=InvArray[drop(InvArray[,4]) == pos,];
+			if (genome1.containsMarkerMutation(m41, pos) != genome2.containsMarkerMutation(m41, pos)) //if the mutation associated with inversion is found only in one of the two genome
+				{ 
+				//inInv = (breakpoints > start) & (breakpoints < end); // Check if recombination breakpoint fall in the inversion (bool vector)
+				inInv = (breakpoints > Array[0,1]) & (breakpoints < Array[0,2]); // Check if recombination breakpoint fall in the inversion (bool vector)
+				if (any(inInv)) //If a recombination breakpoint fall in the inversion breakpoint, 
+					{
+					breakpoints = breakpoints[!inInv]; //If not, this recombination can't occur
+					Bool=1;
+					}
+				}
+			}
+		else //If all recombination event have been suppressed, Slim bug. Thus defined a recombination even at chromosome end //Probably useless
+			{
+			Array=InvArray[drop(InvArray[,4]) == pos,];
+			if (genome1.containsMarkerMutation(m41, pos) != genome2.containsMarkerMutation(m41, pos)) //if the mutation associated with inversion is found in the two genome
+				{ 
+				inInv = (breakpoints > Array[0,1]) & (breakpoints < Array[0,2]); // Check if recombination breakpoint fall in the inversion (bool vector)
+				if (any(inInv)) //If a recombination breakpoint fall in the inversion breakpoint, 
+					{
+			  	breakpoints = c(GS); //Instead of suppressing the last recombination event, just replace it by a recombination at a useless position, e.g. end of chromosome 
+			  	Bool=1;
+					}
+				}
+			}
+		}
+	}
+	if (sim.generation % 1000 == 0) //every 1000 generation
+		{
+		if (genome1.containsMarkerMutation(m2, asInteger(GS/4)) != genome2.containsMarkerMutation(m2, asInteger(GS/4))) //if the mutation associated with the male (Y) is found only in one of the two genome (i.e. not considering recombination in XX individuals)
+			{
+			inChr10 = sum((breakpoints >= 0) & (breakpoints < 1000000)); //NUmber of recombination event every 1Mb
+			inChr11 = sum((breakpoints >= 1000000) & (breakpoints < 2000000));
+			inChr12 = sum((breakpoints >= 2000000) & (breakpoints < 3000000));
+			inChr13 = sum((breakpoints >= 3000000) & (breakpoints < 4000000));
+			inChr14 = sum((breakpoints >= 4000000) & (breakpoints < 5000000));
+			inChr15 = sum((breakpoints >= 5000000) & (breakpoints < 6000000));
+			inChr16 = sum((breakpoints >= 6000000) & (breakpoints < 7000000));
+			inChr17 = sum((breakpoints >= 7000000) & (breakpoints < 8000000));
+			inChr18 = sum((breakpoints >= 8000000) & (breakpoints < 9000000));
+			inChr19 = sum((breakpoints >= 9000000) & (breakpoints < 10000000));
+			inChr20 = sum((breakpoints >= 10000000) & (breakpoints < 11000000));
+			inChr21 = sum((breakpoints >= 11000000) & (breakpoints < 12000000));
+			inChr22 = sum((breakpoints >= 12000000) & (breakpoints < 13000000));
+			inChr23 = sum((breakpoints >= 13000000) & (breakpoints < 14000000));
+			inChr24 = sum((breakpoints >= 14000000) & (breakpoints < 15000000));
+			inChr25 = sum((breakpoints >= 15000000) & (breakpoints < 16000000));
+			inChr26 = sum((breakpoints >= 16000000) & (breakpoints < 17000000));
+			inChr27 = sum((breakpoints >= 17000000) & (breakpoints < 18000000));
+			inChr28 = sum((breakpoints >= 18000000) & (breakpoints < 19000000));
+			inChr29 = sum((breakpoints >= 19000000) & (breakpoints < 20000000));
+			inChr30 = sum((breakpoints >= 20000000) & (breakpoints < 21000000));
+			inChr31 = sum((breakpoints >= 21000000) & (breakpoints < 22000000));
+			inChr32 = sum((breakpoints >= 22000000) & (breakpoints < 23000000));
+			inChr33 = sum((breakpoints >= 23000000) & (breakpoints < 24000000));
+			inChr34 = sum((breakpoints >= 24000000) & (breakpoints < 25000000));
+			inChr35 = sum((breakpoints >= 25000000) & (breakpoints < 26000000));
+			inChr36 = sum((breakpoints >= 26000000) & (breakpoints < 27000000));
+			inChr37 = sum((breakpoints >= 27000000) & (breakpoints < 28000000));
+			inChr38 = sum((breakpoints >= 28000000) & (breakpoints < 29000000));
+			inChr39 = sum((breakpoints >= 29000000) & (breakpoints < 30000000));
+			inChr40 = sum((breakpoints >= 30000000) & (breakpoints < 31000000));
+			inChr41 = sum((breakpoints >= 31000000) & (breakpoints < 32000000));
+			inChr42 = sum((breakpoints >= 32000000) & (breakpoints < 33000000));
+			inChr43 = sum((breakpoints >= 33000000) & (breakpoints < 34000000));
+			inChr44 = sum((breakpoints >= 34000000) & (breakpoints < 35000000));
+			inChr45 = sum((breakpoints >= 35000000) & (breakpoints < 36000000));
+			inChr46 = sum((breakpoints >= 36000000) & (breakpoints < 37000000));
+			inChr47 = sum((breakpoints >= 37000000) & (breakpoints < 38000000));
+			inChr48 = sum((breakpoints >= 38000000) & (breakpoints < 39000000));
+			inChr49 = sum((breakpoints >= 39000000) & (breakpoints < 40000000));
+			inChr50 = sum((breakpoints >= 40000000) & (breakpoints < 41000000));
+			inChr51 = sum((breakpoints >= 41000000) & (breakpoints < 42000000));
+			inChr52 = sum((breakpoints >= 42000000) & (breakpoints < 43000000));
+			inChr53 = sum((breakpoints >= 43000000) & (breakpoints < 44000000));
+			inChr54 = sum((breakpoints >= 44000000) & (breakpoints < 45000000));
+			inChr55 = sum((breakpoints >= 45000000) & (breakpoints < 46000000));
+			inChr56 = sum((breakpoints >= 46000000) & (breakpoints < 47000000));
+			inChr57 = sum((breakpoints >= 47000000) & (breakpoints < 48000000));
+			inChr58 = sum((breakpoints >= 48000000) & (breakpoints < 49000000));
+			inChr59 = sum((breakpoints >= 49000000) & (breakpoints < 50000000));
+			inChr60 = sum((breakpoints >= 50000000) & (breakpoints < 51000000));
+			inChr61 = sum((breakpoints >= 51000000) & (breakpoints < 52000000));
+			inChr62 = sum((breakpoints >= 52000000) & (breakpoints < 53000000));
+			inChr63 = sum((breakpoints >= 53000000) & (breakpoints < 54000000));
+			inChr64 = sum((breakpoints >= 54000000) & (breakpoints < 55000000));
+			inChr65 = sum((breakpoints >= 55000000) & (breakpoints < 56000000));
+			inChr66 = sum((breakpoints >= 56000000) & (breakpoints < 57000000));
+			inChr67 = sum((breakpoints >= 57000000) & (breakpoints < 58000000));
+			inChr68 = sum((breakpoints >= 58000000) & (breakpoints < 59000000));
+			inChr69 = sum((breakpoints >= 59000000) & (breakpoints < 60000000));
+			inChr70 = sum((breakpoints >= 60000000) & (breakpoints < 61000000));
+			inChr71 = sum((breakpoints >= 61000000) & (breakpoints < 62000000));
+			inChr72 = sum((breakpoints >= 62000000) & (breakpoints < 63000000));
+			inChr73 = sum((breakpoints >= 63000000) & (breakpoints < 64000000));
+			inChr74 = sum((breakpoints >= 64000000) & (breakpoints < 65000000));
+			inChr75 = sum((breakpoints >= 65000000) & (breakpoints < 66000000));
+			inChr76 = sum((breakpoints >= 66000000) & (breakpoints < 67000000));
+			inChr77 = sum((breakpoints >= 67000000) & (breakpoints < 68000000));
+			inChr78 = sum((breakpoints >= 68000000) & (breakpoints < 69000000));
+			inChr79 = sum((breakpoints >= 69000000) & (breakpoints < 70000000));
+			inChr80 = sum((breakpoints >= 70000000) & (breakpoints < 71000000));
+			inChr81 = sum((breakpoints >= 71000000) & (breakpoints < 72000000));
+			inChr82 = sum((breakpoints >= 72000000) & (breakpoints < 73000000));
+			inChr83 = sum((breakpoints >= 73000000) & (breakpoints < 74000000));
+			inChr84 = sum((breakpoints >= 74000000) & (breakpoints < 75000000));
+			inChr85 = sum((breakpoints >= 75000000) & (breakpoints < 76000000));
+			inChr86 = sum((breakpoints >= 76000000) & (breakpoints < 77000000));
+			inChr87 = sum((breakpoints >= 77000000) & (breakpoints < 78000000));
+			inChr88 = sum((breakpoints >= 78000000) & (breakpoints < 79000000));
+			inChr89 = sum((breakpoints >= 79000000) & (breakpoints < 80000000));
+			inChr90 = sum((breakpoints >= 80000000) & (breakpoints < 81000000));
+			inChr91 = sum((breakpoints >= 81000000) & (breakpoints < 82000000));
+			inChr92 = sum((breakpoints >= 82000000) & (breakpoints < 83000000));
+			inChr93 = sum((breakpoints >= 83000000) & (breakpoints < 84000000));
+			inChr94 = sum((breakpoints >= 84000000) & (breakpoints < 85000000));
+			inChr95 = sum((breakpoints >= 85000000) & (breakpoints < 86000000));
+			inChr96 = sum((breakpoints >= 86000000) & (breakpoints < 87000000));
+			inChr97 = sum((breakpoints >= 87000000) & (breakpoints < 88000000));
+			inChr98 = sum((breakpoints >= 88000000) & (breakpoints < 89000000));
+			inChr99 = sum((breakpoints >= 89000000) & (breakpoints < 90000000));
+			inChr100 = sum((breakpoints >= 90000000) & (breakpoints < 91000000));
+			inChr101 = sum((breakpoints >= 91000000) & (breakpoints < 92000000));
+			inChr102 = sum((breakpoints >= 92000000) & (breakpoints < 93000000));
+			inChr103 = sum((breakpoints >= 93000000) & (breakpoints < 94000000));
+			inChr104 = sum((breakpoints >= 94000000) & (breakpoints < 95000000));
+			inChr105 = sum((breakpoints >= 95000000) & (breakpoints < 96000000));
+			inChr106 = sum((breakpoints >= 96000000) & (breakpoints < 97000000));
+			inChr107 = sum((breakpoints >= 97000000) & (breakpoints < 98000000));
+			inChr108 = sum((breakpoints >= 98000000) & (breakpoints < 99000000));
+			inChr109 = sum((breakpoints >= 99000000) & (breakpoints < 100000000));
+			inChr110 = sum((breakpoints >= 100000000) & (breakpoints < 101000000));
+			inChr111 = sum((breakpoints >= 101000000) & (breakpoints < 102000000));
+			inChr112 = sum((breakpoints >= 102000000) & (breakpoints < 103000000));
+			inChr113 = sum((breakpoints >= 103000000) & (breakpoints < 104000000));
+			inChr114 = sum((breakpoints >= 104000000) & (breakpoints < 105000000));
+			inChr115 = sum((breakpoints >= 105000000) & (breakpoints < 106000000));
+			inChr116 = sum((breakpoints >= 106000000) & (breakpoints < 107000000));
+			inChr117 = sum((breakpoints >= 107000000) & (breakpoints < 108000000));
+			inChr118 = sum((breakpoints >= 108000000) & (breakpoints < 109000000));
+			inChr119 = sum((breakpoints >= 109000000) & (breakpoints < 110000000));
+			inChr120 = sum((breakpoints >= 110000000) & (breakpoints < 111000000));
+			inChr121 = sum((breakpoints >= 111000000) & (breakpoints < 112000000));
+			inChr122 = sum((breakpoints >= 112000000) & (breakpoints < 113000000));
+			inChr123 = sum((breakpoints >= 113000000) & (breakpoints < 114000000));
+			inChr124 = sum((breakpoints >= 114000000) & (breakpoints < 115000000));
+			inChr125 = sum((breakpoints >= 115000000) & (breakpoints < 116000000));
+			inChr126 = sum((breakpoints >= 116000000) & (breakpoints < 117000000));
+			inChr127 = sum((breakpoints >= 117000000) & (breakpoints < 118000000));
+			inChr128 = sum((breakpoints >= 118000000) & (breakpoints < 119000000));
+			inChr129 = sum((breakpoints >= 119000000) & (breakpoints < 120000000));
+			inChr130 = sum((breakpoints >= 120000000) & (breakpoints < 121000000));
+			inChr131 = sum((breakpoints >= 121000000) & (breakpoints < 122000000));
+			inChr132 = sum((breakpoints >= 122000000) & (breakpoints < 123000000));
+			inChr133 = sum((breakpoints >= 123000000) & (breakpoints < 124000000));
+			inChr134 = sum((breakpoints >= 124000000) & (breakpoints < 125000000));
+			inChr135 = sum((breakpoints >= 125000000) & (breakpoints < 126000000));
+			inChr136 = sum((breakpoints >= 126000000) & (breakpoints < 127000000));
+			inChr137 = sum((breakpoints >= 127000000) & (breakpoints < 128000000));
+			inChr138 = sum((breakpoints >= 128000000) & (breakpoints < 129000000));
+			inChr139 = sum((breakpoints >= 129000000) & (breakpoints < 130000000));
+			inChr140 = sum((breakpoints >= 130000000) & (breakpoints < 131000000));
+			inChr141 = sum((breakpoints >= 131000000) & (breakpoints < 132000000));
+			inChr142 = sum((breakpoints >= 132000000) & (breakpoints < 133000000));
+			inChr143 = sum((breakpoints >= 133000000) & (breakpoints < 134000000));
+			inChr144 = sum((breakpoints >= 134000000) & (breakpoints < 135000000));
+			inChr145 = sum((breakpoints >= 135000000) & (breakpoints < 136000000));
+			inChr146 = sum((breakpoints >= 136000000) & (breakpoints < 137000000));
+			inChr147 = sum((breakpoints >= 137000000) & (breakpoints < 138000000));
+			inChr148 = sum((breakpoints >= 138000000) & (breakpoints < 139000000));
+			inChr149 = sum((breakpoints >= 139000000) & (breakpoints < 140000000));
+			inChr150 = sum((breakpoints >= 140000000) & (breakpoints < 141000000));
+			inChr151 = sum((breakpoints >= 141000000) & (breakpoints < 142000000));
+			inChr152 = sum((breakpoints >= 142000000) & (breakpoints < 143000000));
+			inChr153 = sum((breakpoints >= 143000000) & (breakpoints < 144000000));
+			inChr154 = sum((breakpoints >= 144000000) & (breakpoints < 145000000));
+			inChr155 = sum((breakpoints >= 145000000) & (breakpoints < 146000000));
+			inChr156 = sum((breakpoints >= 146000000) & (breakpoints < 147000000));
+			inChr157 = sum((breakpoints >= 147000000) & (breakpoints < 148000000));
+			inChr158 = sum((breakpoints >= 148000000) & (breakpoints < 149000000));
+			inChr159 = sum((breakpoints >= 149000000) & (breakpoints < 150000000));
+			inChr160 = sum((breakpoints >= 150000000) & (breakpoints < 151000000));
+			inChr161 = sum((breakpoints >= 151000000) & (breakpoints < 152000000));
+			inChr162 = sum((breakpoints >= 152000000) & (breakpoints < 153000000));
+			inChr163 = sum((breakpoints >= 153000000) & (breakpoints < 154000000));
+			inChr164 = sum((breakpoints >= 154000000) & (breakpoints < 155000000));
+			inChr165 = sum((breakpoints >= 155000000) & (breakpoints < 156000000));
+			inChr166 = sum((breakpoints >= 156000000) & (breakpoints < 157000000));
+			inChr167 = sum((breakpoints >= 157000000) & (breakpoints < 158000000));
+			inChr168 = sum((breakpoints >= 158000000) & (breakpoints < 159000000));
+			inChr169 = sum((breakpoints >= 159000000) & (breakpoints < 160000000));
+			inChr170 = sum((breakpoints >= 160000000) & (breakpoints < 161000000));
+			inChr171 = sum((breakpoints >= 161000000) & (breakpoints < 162000000));
+			inChr172 = sum((breakpoints >= 162000000) & (breakpoints < 163000000));
+			inChr173 = sum((breakpoints >= 163000000) & (breakpoints < 164000000));
+			inChr174 = sum((breakpoints >= 164000000) & (breakpoints < 165000000));
+			inChr175 = sum((breakpoints >= 165000000) & (breakpoints < 166000000));
+			inChr176 = sum((breakpoints >= 166000000) & (breakpoints < 167000000));
+			inChr177 = sum((breakpoints >= 167000000) & (breakpoints < 168000000));
+			inChr178 = sum((breakpoints >= 168000000) & (breakpoints < 169000000));
+			inChr179 = sum((breakpoints >= 169000000) & (breakpoints < 170000000));
+			inChr180 = sum((breakpoints >= 170000000) & (breakpoints < 171000000));
+			inChr181 = sum((breakpoints >= 171000000) & (breakpoints < 172000000));
+			inChr182 = sum((breakpoints >= 172000000) & (breakpoints < 173000000));
+			inChr183 = sum((breakpoints >= 173000000) & (breakpoints < 174000000));
+			inChr184 = sum((breakpoints >= 174000000) & (breakpoints < 175000000));
+			inChr185 = sum((breakpoints >= 175000000) & (breakpoints < 176000000));
+			inChr186 = sum((breakpoints >= 176000000) & (breakpoints < 177000000));
+			inChr187 = sum((breakpoints >= 177000000) & (breakpoints < 178000000));
+			inChr188 = sum((breakpoints >= 178000000) & (breakpoints < 179000000));
+			inChr189 = sum((breakpoints >= 179000000) & (breakpoints < 180000000));
+			inChr190 = sum((breakpoints >= 180000000) & (breakpoints < 181000000));
+			inChr191 = sum((breakpoints >= 181000000) & (breakpoints < 182000000));
+			inChr192 = sum((breakpoints >= 182000000) & (breakpoints < 183000000));
+			inChr193 = sum((breakpoints >= 183000000) & (breakpoints < 184000000));
+			inChr194 = sum((breakpoints >= 184000000) & (breakpoints < 185000000));
+			inChr195 = sum((breakpoints >= 185000000) & (breakpoints < 186000000));
+			inChr196 = sum((breakpoints >= 186000000) & (breakpoints < 187000000));
+			inChr197 = sum((breakpoints >= 187000000) & (breakpoints < 188000000));
+			inChr198 = sum((breakpoints >= 188000000) & (breakpoints < 189000000));
+			inChr199 = sum((breakpoints >= 189000000) & (breakpoints < 190000000));
+			inChr200 = sum((breakpoints >= 190000000) & (breakpoints < 191000000));
+			inChr201 = sum((breakpoints >= 191000000) & (breakpoints < 192000000));
+			inChr202 = sum((breakpoints >= 192000000) & (breakpoints < 193000000));
+			inChr203 = sum((breakpoints >= 193000000) & (breakpoints < 194000000));
+			inChr204 = sum((breakpoints >= 194000000) & (breakpoints < 195000000));
+			inChr205 = sum((breakpoints >= 195000000) & (breakpoints < 196000000));
+			inChr206 = sum((breakpoints >= 196000000) & (breakpoints < 197000000));
+			inChr207 = sum((breakpoints >= 197000000) & (breakpoints < 198000000));
+			inChr208 = sum((breakpoints >= 198000000) & (breakpoints < 199000000));
+			inChr209 = sum((breakpoints >= 199000000) & (breakpoints < 200000000));
+			writeFile(fileRec, paste(c("Recombination:\t",inChr10,"\t",inChr11,"\t",inChr12,"\t",inChr13,"\t",inChr14,"\t",inChr15,"\t",inChr16,"\t",inChr17,"\t",inChr18,"\t",inChr19,"\t",inChr20,"\t",inChr21,"\t",inChr22,"\t",inChr23,"\t",inChr24,"\t",inChr25,"\t",inChr26,"\t",inChr27,"\t",inChr28,"\t",inChr29,"\t",inChr30,"\t",inChr31,"\t",inChr32,"\t",inChr33,"\t",inChr34,"\t",inChr35,"\t",inChr36,"\t",inChr37,"\t",inChr38,"\t",inChr39,"\t",inChr40,"\t",inChr41,"\t",inChr42,"\t",inChr43,"\t",inChr44,"\t",inChr45,"\t",inChr46,"\t",inChr47,"\t",inChr48,"\t",inChr49,"\t",inChr50,"\t",inChr51,"\t",inChr52,"\t",inChr53,"\t",inChr54,"\t",inChr55,"\t",inChr56,"\t",inChr57,"\t",inChr58,"\t",inChr59,"\t",inChr60,"\t",inChr61,"\t",inChr62,"\t",inChr63,"\t",inChr64,"\t",inChr65,"\t",inChr66,"\t",inChr67,"\t",inChr68,"\t",inChr69,"\t",inChr70,"\t",inChr71,"\t",inChr72,"\t",inChr73,"\t",inChr74,"\t",inChr75,"\t",inChr76,"\t",inChr77,"\t",inChr78,"\t",inChr79,"\t",inChr80,"\t",inChr81,"\t",inChr82,"\t",inChr83,"\t",inChr84,"\t",inChr85,"\t",inChr86,"\t",inChr87,"\t",inChr88,"\t",inChr89,"\t",inChr90,"\t",inChr91,"\t",inChr92,"\t",inChr93,"\t",inChr94,"\t",inChr95,"\t",inChr96,"\t",inChr97,"\t",inChr98,"\t",inChr99,"\t",inChr100,"\t",inChr101,"\t",inChr102,"\t",inChr103,"\t",inChr104,"\t",inChr105,"\t",inChr106,"\t",inChr107,"\t",inChr108,"\t",inChr109,"\t",inChr110,"\t",inChr111,"\t",inChr112,"\t",inChr113,"\t",inChr114,"\t",inChr115,"\t",inChr116,"\t",inChr117,"\t",inChr118,"\t",inChr119,"\t",inChr120,"\t",inChr121,"\t",inChr122,"\t",inChr123,"\t",inChr124,"\t",inChr125,"\t",inChr126,"\t",inChr127,"\t",inChr128,"\t",inChr129,"\t",inChr130,"\t",inChr131,"\t",inChr132,"\t",inChr133,"\t",inChr134,"\t",inChr135,"\t",inChr136,"\t",inChr137,"\t",inChr138,"\t",inChr139,"\t",inChr140,"\t",inChr141,"\t",inChr142,"\t",inChr143,"\t",inChr144,"\t",inChr145,"\t",inChr146,"\t",inChr147,"\t",inChr148,"\t",inChr149,"\t",inChr150,"\t",inChr151,"\t",inChr152,"\t",inChr153,"\t",inChr154,"\t",inChr155,"\t",inChr156,"\t",inChr157,"\t",inChr158,"\t",inChr159,"\t",inChr160,"\t",inChr161,"\t",inChr162,"\t",inChr163,"\t",inChr164,"\t",inChr165,"\t",inChr166,"\t",inChr167,"\t",inChr168,"\t",inChr169,"\t",inChr170,"\t",inChr171,"\t",inChr172,"\t",inChr173,"\t",inChr174,"\t",inChr175,"\t",inChr176,"\t",inChr177,"\t",inChr178,"\t",inChr179,"\t",inChr180,"\t",inChr181,"\t",inChr182,"\t",inChr183,"\t",inChr184,"\t",inChr185,"\t",inChr186,"\t",inChr187,"\t",inChr188,"\t",inChr189,"\t",inChr190,"\t",inChr191,"\t",inChr192,"\t",inChr193,"\t",inChr194,"\t",inChr195,"\t",inChr196,"\t",inChr197,"\t",inChr198,"\t",inChr199,"\t",inChr200,"\t",inChr201,"\t",inChr202,"\t",inChr203,"\t",inChr204,"\t",inChr205,"\t",inChr206,"\t",inChr207,"\t",inChr208,"\t",inChr209), sep=""), append=T); //Write the number of Recombination in the recombination files !
+			}
+		}
+		
+	if (Bool==0)
+		{ return F;} //Nothing happens
+	else
+		{ return T;} // A least one recombination event was suppressed
+	}

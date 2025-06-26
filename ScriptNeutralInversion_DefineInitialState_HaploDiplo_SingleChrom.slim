@@ -1,0 +1,121 @@
+// set up a simple neutral simulation
+initialize() {
+	// set the overall mutation rate
+	initializeMutationRate(mu);
+	// m1 mutation type: neutral
+	initializeMutationType("m1", h, "f", s);
+	initializeMutationType("m2", 0.5, "f", 0);// mutation defining mating type locus 1
+	initializeMutationType("m3", 0.5, "f", 0);// mutation defining genome 2
+	initializeMutationType("m4", 0.5, "f", 0);// mutation defining inversion 1
+
+	// g1 genomic element type: uses m1 for all mutations
+	initializeGenomicElementType("g1", m1, 1.0);
+
+	// uniform chromosome of length 10Mb for one chromosome
+	initializeGenomicElement(g1, 0,9999999);
+
+
+	// uniform recombination along two chromosomes
+	rates=c(r);//One chromosomes 	
+    ends=c(9999999); //one chromosome of size 10000000	
+	initializeRecombinationRate(rates, ends);
+}
+// create a population of N individuals
+1 late(){
+	sim.addSubpop("p1", N);
+	defineConstant("simID", getSeed());
+	sample1=sample(sim.subpopulations.individuals, integerDiv(N,2)); // Sample half of samples 
+	G1=sample1.genome1;
+	sample2=sample(sim.subpopulations.individuals, integerDiv(N,2)); // Sample half of samples 
+	G2=sample2.genome2;
+	Gtot=c(G1, G2);
+	Gtot.addNewDrawnMutation(m2, 5000000); // Introduce in half of genome 1 and genome 2 the mating type mutation
+}
+
+fitness(m1) {
+if (sim.generation % MutHaplo == 0) //haploid phase
+	{
+	return 1.0 + mut.selectionCoeff; //whatever the dominance coefficient, it is alway 1 every 2 generation (during the haploid phase)
+	}
+else //non haploid phase
+	{
+	return relFitness;
+	}
+}
+
+2:15000 early(){
+if (sim.generation % MutHaplo == 0) //haploid phase
+	{
+	sim.subpopulations.individuals.genome2.removeMutations(sim.subpopulations.individuals.genome2.mutationsOfType(m1)); // remove all mutation of genome 2 : a simple way to set the fitness effect of genome 2 = 1
+	sim.subpopulations.individuals.genome2.addNewDrawnMutation(m3, 1); //Add a marker mutation to recognise genome 2. Because no gamete from genome 2 are used, this mutation disapear every generations
+	}
+	//meanMut1=mean(sim.subpopulations.individuals.genome2.countOfMutationsOfType(m1)); //Number of mutations in genome 1 //used to check
+	//meanMut2=mean(sim.subpopulations.individuals.genome1.countOfMutationsOfType(m1)); //Number of mutations in genome 1
+	//meanMutAll=mean(sim.subpopulations.individuals.countOfMutationsOfType(m1)); //Number of mutations in individuals
+	if (sim.generation % 100 == 1) //output every 100 generation for plottting
+		{
+		Genomes=p1.genomes; // All genomes
+		NMutVec=c();
+		NMutVec_AroundMT=c();
+		for (g in Genomes) { //For all genome // Far from being optimized...
+			NbMut=g.countOfMutationsOfType(m1);
+			NMutVec=c(NMutVec, NbMut);
+			}
+		meanNbMut=mean(NMutVec);//Mean number of mutation in genomes
+		mut1 = sim.mutationsOfType(m1);
+		Nmut1= sim.countOfMutationsOfType(m1); //number of mutations
+		Freq1=sim.mutationFrequencies(NULL, mut1); 
+		MeanFreq1=mean(Freq1); //Mean frequency of mutations
+		line=paste(c(N,"\t", mu,"\t",r,"\t",h,"\t",s,"\t",MutHaplo, "\t", sim.generation,"\t", meanNbMut,"\t", Nmut1, "\t", MeanFreq1)); //output the frequency of a given mutation
+		writeFile(paste(c("../InitialState/slim_g15000_MidSDR_10MChrom_N=" , N , "_r=" , r , "_u=" , mu , "_s=" , s , "_h=" , h , "_FreqHaplo=", MutHaplo, "_" , simID , "_Stat.txt"), sep=""), line, append=T);
+		}
+}
+
+2:15000	modifyChild(p1) { //simulating the meeting between two gamete and fecondation depand on their genotype
+if (sim.generation % MutHaplo == 0) //Mating during the haploid phase is only allowed between genome 1 (the genome 2 is inactive during the haploid phase) and if they have different mating type. During the diploid phase, the child generation generate haploid individual (individual for whome the second genome is inactive). Thus, we do not care about the mating type of these mating genomes. 
+	{
+	Gamete1MT = childGenome1.containsMarkerMutation(m2, 5000000); //Checking the MT of the 1st gamete for the locus 1
+	//catn(Gamete1MT);
+	Gamete2MT = childGenome2.containsMarkerMutation(m2, 5000000); //Checking the MT of the 2nd gamete for the locus 1
+	//catn(Gamete2MT);
+	if (identical(Gamete1MT, Gamete2MT)){ //check the difference a the first locus
+			return F;} //No mating between game with the same MT
+	else
+		{
+		if (childGenome2.containsMarkerMutation(m3, 1) == T | childGenome1.containsMarkerMutation(m3, 1) == T){ //all mating between gamete coming from genome 2 are removed)
+			return F;} 
+		else {
+			return T;
+			}
+		}
+	}
+	else //diploid phase
+	{
+		Gamete1MT = childGenome1.containsMarkerMutation(m2, 5000000); //Checking the MT of the 1 gamete for the locus 1
+		//catn(Gamete1MT);
+		Gamete2MT = childGenome2.containsMarkerMutation(m2, 5000000); //Checking the MT of the 1 gamete for the locus 1
+		//catn(Gamete2MT);
+		if (identical(Gamete1MT, Gamete2MT)){ //check the difference a the first locus
+				return F;} //No mating between game with the same MT
+		else
+		{
+		return T;
+		}
+	}
+}
+
+15000 late() {
+sim.outputFull("../InitialState/slim_g15000_MidSDR_10MChrom_XY_N=" + N + "_r=" + r + "_u=" + mu + "_s=" + s + "_h=" + h + "_" + simID + ".txt");
+sim.simulationFinished();
+}
+
+recombination() {
+	if (sim.generation % MutHaplo == 0) //No recombination between the two genome during the haploid phase : the genome 2 is inactive
+	{
+		breakpoints=c(9999999);//Remove all breakpoints and create just one at the chromosome end to be sure SLiM dont crash...
+		return T;
+	}
+	else
+		{return F;}
+}
+

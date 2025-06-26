@@ -1,0 +1,121 @@
+// set up a simple neutral simulation
+initialize() {
+	// set the overall mutation rate
+	initializeMutationRate(mu);
+	// m1 mutation type: neutral
+	initializeMutationType("m1", h, "f", s);
+	initializeMutationType("m2", 0.5, "f", 0);// mutation defining mating type locus 1
+	initializeMutationType("m4", 0.5, "f", 0);// mutation defining inversion 1
+
+	// g1 genomic element type: uses m1 for all mutations
+	initializeGenomicElementType("g1", m1, 1.0);
+
+	// uniform chromosome of length 10Mb for two chromosome
+	initializeGenomicElement(g1, 0,19999999);
+
+
+	// uniform recombination along two chromosomes
+	rates=c(r, 0.5, r);//Two chromosomes	
+    ends=c(9999999,10000000,19999999); //Two chromosome of size 1000000	
+	initializeRecombinationRate(rates, ends);
+}
+15000 {
+	defineConstant("pos",start+integerDiv(end-start,2)); //Pos, the position of the inversion marker, must be an integer. Here, I use integerDiv to calculate the middle of the position of the inversion and define it as an integer
+	defineConstant("sizeInv",end-start+1); //The size of the inversion : used for output printing
+}
+
+15000 late() { //using late() just to avoid drift the first generation
+	sim.readFromPopulationFile(Init); // Read the initial population file.
+	// start a newly seeded run
+	setSeed(rdunif(1, 0, asInteger(2^62) - 1));
+	sample(p1.genomes, 1).addNewDrawnMutation(m4, pos); //introduce a new inversion
+	VecMut=p1.genomes.containsMarkerMutation(m4,pos);//vector of boolean depending on whether genome that contain the inversion
+	genomeWInv=p1.genomes[VecMut]; // genome with inversion
+	genomeNoInv=p1.genomes[!VecMut];//genome without inversion
+	posMut = genomeWInv.mutationsOfType(m1).position;
+	NbMutInv=sum((posMut >= start) & (posMut < end)); //nb of mutation in inversion
+	MutInvBool=((posMut >= start) & (posMut < end));
+    MutInv=genomeWInv.mutationsOfType(m1)[MutInvBool];
+    MutInvFreq=mean(sim.mutationFrequencies(NULL, MutInv)); //mean frequency of mutations in inversion
+	NMutNoInvvec=c();
+	FreqMutNoInvvec=c();
+	for (g in genomeNoInv) { //For all genome without the inversion
+		posMut = g.mutationsOfType(m1).position; //position of mutation in this genome
+		NbMut=sum((posMut >= start) & (posMut < end)); //Number of mutation in the inversion region
+		NMutNoInvvec=c(NMutNoInvvec, NbMut); //put in a vector
+		MutNoInvBool=((posMut >= start) & (posMut < end));
+    	MutNoInv=g.mutationsOfType(m1)[MutNoInvBool];
+		if( NbMut > 0)
+		{
+    	MutNoInvFreq=mean(sim.mutationFrequencies(NULL, MutNoInv)); //Mean frequency of mutation in the inversion
+		FreqMutNoInvvec=c(FreqMutNoInvvec, MutNoInvFreq); //put in a vector
+		}
+	}
+	meanNbMutNoInv=mean(NMutNoInvvec);
+	meanFreqMutNoInv=mean(FreqMutNoInvvec);
+	defineConstant("NMutInv",NbMutInv); //The size of the inversion : used for output printing
+	defineConstant("NMutNoInv",meanNbMutNoInv); //The size of the inversion : used for output printing
+	defineConstant("FreqMutNoInv",meanFreqMutNoInv); //The size of the inversion : used for output printing
+	defineConstant("FreqMutInv",MutInvFreq); //The size of the inversion : used for output printing
+}
+15001 early() { 
+	VecMut=p1.genomes.containsMarkerMutation(m4,pos);//vector of boolean depending on whether genome that contain the inversion
+	genomeWInv=p1.genomes[VecMut]; // genome with inversion
+	genomeNoInv=p1.genomes[!VecMut];//genome without inversion
+    meanFitnessInv=p1.cachedFitness(genomeWInv.individual.index); //Mean Fitness of sample with inversion
+    meanFitnessNoInv=mean(p1.cachedFitness(genomeNoInv.individual.index));//Mean Fitness of sample without inversion
+	defineConstant("FitNoInv",meanFitnessNoInv); //The size of the inversion : used for output printing
+	defineConstant("FitInv",meanFitnessInv); //The size of the inversion : used for output printing
+}
+
+15000:25000	modifyChild(p1) { //simulating the meeting between two gamete and fecondation depand on their genotype
+	Gamete1MT1 = childGenome2.mutationsOfType(m2); //Checking the MT of the 1 gamete for the locus 1
+	Gamete2MT1 = childGenome1.mutationsOfType(m2); //Checking the MT of the 2 gamete for the locus 1
+	if (identical(Gamete1MT1, Gamete2MT1)){ //check the difference a the first locus
+			return F;} 
+	return T;
+}
+
+
+15001:25000 early() { //record inversion frequency 
+	if (sim.generation % 2 == 0) //every 30 generation
+	{
+		//fileLost=paste(c("../Output/Inv=",start, "-", end, "_r=", r, "_u=",mu ,"IntroduceInvFromInit_Nmut_Freq_Fit_10000Gen_Lost.txt"), sep="");
+		file=paste(c("../Output/Inv=",start, "-", end, "_r=", r, "_u=",mu ,"_h=",h,"_s=",s,"IntroduceInvFromInit_Nmut_Freq_Fit_IndivPlot_HomoHeteroRecombMod.txt"), sep="");
+		mut4 = sim.mutationsOfType(m4);
+		if (size (mut4) != 1)
+		{
+		//	cat("LOST\n");
+			line=paste(c(N,"\t", mu,"\t",r,"\t",h,"\t",s,"\t",sim.generation,"\t",start,"\t",end,"\t",rep,"\t",NMutInv, "\t",FreqMutInv, "\t",FitInv, "\t", NMutNoInv,"\t", FreqMutNoInv,"\t", FitNoInv, "\t","0.0")); //output the frequency of a given mutation
+			writeFile(file, line, append=T);
+			sim.simulationFinished();
+		}
+		else
+		{
+		Freq4=sim.mutationFrequencies(NULL, mut4);
+		line=paste(c(N,"\t", mu,"\t",r,"\t",h,"\t",s,"\t",sim.generation,"\t",start,"\t",end,"\t",rep,"\t",NMutInv, "\t",FreqMutInv, "\t",FitInv, "\t", NMutNoInv,"\t", FreqMutNoInv,"\t", FitNoInv, "\t", Freq4)); //output the frequency of a given mutation
+		writeFile(file, line, append=T);
+		}
+	}
+}
+
+25000 late() {
+	sim.simulationFinished();
+}
+
+recombination() { //Define special recombination pattern depending on mutation (inversion) presence
+	if (!genome1.containsMarkerMutation(m4, pos) & !genome2.containsMarkerMutation(m4, pos)) //if the inversion is found in none of the two genomes
+		{
+		return F;
+		}
+	else
+		{
+		inInv = (breakpoints > start) & (breakpoints < end); //Define breakpoint of inversion
+		if (!any(inInv)) //If no recombination breakpoint fall in the inversion breakpoint, 
+			{return F;} // Nothing happens
+		else 
+			{breakpoints = breakpoints[!inInv]; //If not, this recombination can't occur
+			return T;
+			}
+		}
+	}

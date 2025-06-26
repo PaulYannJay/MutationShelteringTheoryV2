@@ -1,0 +1,171 @@
+// set up a simple neutral simulation
+initialize() {
+	// set the overall mutation rate
+	initializeMutationRate(mu);
+	// m1 mutation type: neutral
+	initializeMutationType("m10", 0, "g", , 0.2); //mutation sampled among a gamma dsitribution
+	/// Note: Parameter des distribution gamma: la moyenne d'une distribution gamma est le produit de ses deux parametre, alpha et betta (Alpha*Beta). Les valeur de beta sont souvent donné en scaled avec la taille de pop, genre 2N. Par exemple, je crois, dans KIm et al 2017, il utilise un parametre Beta de 3226, pour une population de 10085. Cela donne une valeur rescalé de 3226/(2*10085)=0.1599. Avec alpha=0.184, cela donne un s moyen de 0.184*0.1599=0.029. Cela semble correspondre !
+
+	initializeMutationType("m10", 0, "g", s, 0.2); //mutation sampled among a gamma dsitribution
+	initializeMutationType("m11", 0.01, "g", s, 0.2);
+	initializeMutationType("m12", 0.1, "g", s, 0.2);
+	initializeMutationType("m13", 0.2, "g", s, 0.2);
+	initializeMutationType("m14", 0.3, "g", s, 0.2);
+	initializeMutationType("m15", 0.4, "g", s, 0.2);
+	initializeMutationType("m16", 0.5, "g", s, 0.2);
+	initializeMutationType("m2", 0.5, "f", 0);// mutation defining mating type locus 1
+	initializeMutationType("m4", 0.5, "f", 0);// mutation defining inversion 1
+
+	// g1 genomic element type: uses m1 for all mutations
+	initializeGenomicElementType("g1", c(m10,m11,m12,m13,m14,m15,m16),c(1,1,1,1,1,1,1)); //mutation with different dominance appear with equal probability
+
+	// uniform chromosome of length 20000 kb for two chromosomes
+	initializeGenomicElement(g1, 0,19999999);
+
+
+	// uniform recombination along two chromosomes
+	rates=c(r, 0.5, r);//Two chromosomes	
+    ends=c(9999999,10000000,19999999); //Two chromosome of size 1000000	
+	initializeRecombinationRate(rates, ends);
+	initializeSex("A");
+}
+
+15000 {
+	defineConstant("pos",start+integerDiv(end-start,2)); //Pos, the position of the inversion marker, must be an integer. Here, I use integerDiv to calculate the middle of the position of the inversion and define it as an integer
+	defineConstant("sizeInv",end-start+1); //The size of the inversion : used for output printing
+}
+
+15000 late() { //using late() just to avoid drift the first generation
+	sim.readFromPopulationFile(Init); //Read the initial population file
+	// start a newly seeded run
+	setSeed(rdunif(1, 0, asInteger(2^62) - 1));
+   	YChromBool=p1.genomes.containsMarkerMutation(m2,5000000);//vector of boolean depending on whether genome that contain the inversion
+    if ( SexChrom == "Y")//SexChrom is a script parameter : Y -> introduce inversion on the Y chromosome;  X -> introduce inversion on the X chromosome
+    { Chrom=p1.genomes[YChromBool];}//vector of boolean depending on whether genome that contain the inversion
+    else
+    {Chrom=p1.genomes[!YChromBool];}
+	sample(Chrom, 1).addNewDrawnMutation(m4, pos); //introduce a new inversion
+	}
+
+15000:25000	modifyChild(p1) { //simulating the meeting between two gamete and fecondation depand on their genotype // XY system
+	numY = sum(child.genomes.containsMarkerMutation(m2, 5000000));
+	// no individual should have more than one Y
+	if (numY > 1)
+		stop("### ERROR: got too many Ys");
+	// females should have 0 Y's
+	if (child.sex == "F" & numY > 0)
+		return F;
+	// males should have 1 Y
+	if (child.sex == "M" & numY == 0)
+		return F;
+	return T;
+}
+
+15001:25000 early() { //record inversion frequency 
+	if (sim.generation % 10 == 1) //every 30 generation
+		{
+		file=paste(c("../Output/N=",N,"_Inv=",start, "-", end, "_r=", r, "_u=",mu ,"_Variableh","_Lambs=",s,"_IntroduceInvFromInit_Nmut_Freq_IndivPlot.txt"), sep="");
+		mut4 = sim.mutationsOfType(m4);//inversion marker
+		if (size (mut4) != 1) //No more inversion segregating in the population ( Inversion ixed or Lost)
+		{
+			sim.simulationFinished(); // The simulation end when their is no more inversion segregating
+		}
+		else
+		{
+		VecMut=p1.genomes.containsMarkerMutation(m4,pos);//vector of boolean depending on whether genome that contain the inversion
+		genomeWInv=p1.genomes[VecMut]; // genome with inversion
+		genomeNoInv=p1.genomes[!VecMut];//genome without inversion
+		//genome no Inv
+		NMutNoInvvec=c(); //vector containg the number of mutation in indiv without inversion
+		FreqMutNoInvvec=c(); //meab frequency of these mutation
+		for (g in genomeNoInv) { //For all genomes without the inversion
+			Mut1=g.mutationsOfType(m10);
+			Mut2=g.mutationsOfType(m11);
+			Mut3=g.mutationsOfType(m12);
+			Mut4=g.mutationsOfType(m13);
+			Mut5=g.mutationsOfType(m14);
+			Mut6=g.mutationsOfType(m15);
+			Mut7=g.mutationsOfType(m16);
+			mut = c(Mut1,Mut2,Mut3,Mut4,Mut5,Mut6,Mut7);
+			posMut = mut.position; //position of mutation in this genome
+			NbMut=sum((posMut >= start) & (posMut < end)); //Number of mutation in the inversion region
+			NMutNoInvvec=c(NMutNoInvvec, NbMut); //put in a vector
+			MutNoInvBool=((posMut >= start) & (posMut < end)); 
+    		MutNoInv=mut[MutNoInvBool];
+    		MutNoInvFreq=mean(sim.mutationFrequencies(NULL, MutNoInv)); //Mean frequency of mutation in the inversion
+			FreqMutNoInvvec=c(FreqMutNoInvvec, MutNoInvFreq); //put in a vector
+			}
+		meanNbMutNoInv=mean(NMutNoInvvec); //mean number of mutation in non-inverted segment
+		sdNbMutNoInv=sd(NMutNoInvvec); // sd
+		maxNbMutNoInv=max(NMutNoInvvec); //max
+		minNbMutNoInv=min(NMutNoInvvec); //min
+		if( size(FreqMutNoInvvec)>0)
+			{
+			meanFreqMutNoInv=mean(FreqMutNoInvvec);
+			}
+		else
+			{
+			meanFreqMutNoInv="NA";
+			}
+		// genome W Inv
+		NMutWInvvec=c();
+		FreqMutWInvvec=c();
+		for (g in genomeWInv) { //For all genomes with the inversion
+			Mut1=g.mutationsOfType(m10);
+			Mut2=g.mutationsOfType(m11);
+			Mut3=g.mutationsOfType(m12);
+			Mut4=g.mutationsOfType(m13);
+			Mut5=g.mutationsOfType(m14);
+			Mut6=g.mutationsOfType(m15);
+			Mut7=g.mutationsOfType(m16);
+			mut = c(Mut1,Mut2,Mut3,Mut4,Mut5,Mut6,Mut7);
+			posMut = mut.position; //position of mutation in this genome
+			NbMut=sum((posMut >= start) & (posMut < end)); //Number of mutation in the inversion region
+			NMutWInvvec=c(NMutWInvvec, NbMut); //put in a vector
+			MutWInvBool=((posMut >= start) & (posMut < end));
+    		MutWInv=mut[MutWInvBool];
+    		MutWInvFreq=mean(sim.mutationFrequencies(NULL, MutWInv)); //Mean frequency of mutation in the inversion
+			FreqMutWInvvec=c(FreqMutWInvvec, MutWInvFreq); //put in a vector
+			}
+		meanNbMutWInv=mean(NMutWInvvec); //Mean number of mutation in inversions
+		if (size(NMutWInvvec) > 1)
+		{ sdNbMutWInv=sd(NMutWInvvec);}
+		else
+		{sdNbMutWInv=0;}
+		maxNbMutWInv=max(NMutWInvvec);
+		minNbMutWInv=min(NMutWInvvec);
+		if( size(FreqMutWInvvec)>0)
+			{
+			meanFreqMutWInv=mean(FreqMutWInvvec);
+			}
+		else
+			{
+			meanFreqMutWInv="NA";
+			}
+    	meanFitnessInv=mean(p1.cachedFitness(genomeWInv.individual.index)); //Mean Fitness of sample with inversion
+    	meanFitnessNoInv=mean(p1.cachedFitness(genomeNoInv.individual.index));//Mean Fitness of sample without inversion
+		Freq4=sim.mutationFrequencies(NULL, mut4);
+		line=paste(c(N,"\t", mu,"\t",r,"\t",s,"\t",sim.generation,"\t",start,"\t",end,"\t",rep,"\t",meanNbMutWInv, "\t",minNbMutWInv, "\t",maxNbMutWInv, "\t",sdNbMutWInv, "\t",meanFreqMutWInv,"\t",meanNbMutNoInv, "\t",minNbMutNoInv, "\t",maxNbMutNoInv, "\t",sdNbMutNoInv, "\t",meanFreqMutNoInv,"\t",meanFitnessInv, "\t", meanFitnessNoInv,"\t", Freq4, "\t", SexChrom)); //output
+		writeFile(file, line, append=T);
+		}
+	}
+}
+
+25000 late() {
+	sim.simulationFinished();
+}
+
+recombination() { //Define special recombination pattern depending on mutation (inversion) presence
+	if (genome1.containsMarkerMutation(m4, pos) == genome2.containsMarkerMutation(m4, pos)) //if the inversion marker is found in the two genome
+		{return F;} //Nothing happens
+	else
+		{ 
+		inInv = (breakpoints > start) & (breakpoints < end); //Define breakpoint of inversion
+		if (!any(inInv)) //If no recombination breakpoint fall in the inversion breakpoint, 
+			{return F;} // Nothing happens
+		else 
+			{breakpoints = breakpoints[!inInv]; //If not, this recombination can't occur
+			return T;
+			}
+		}
+	}
