@@ -9,15 +9,23 @@ For the simulations with SLiM, their is two types of analyses:
 For these analyses, we first perform burn-in simulations to create "initial populations", and then introduce in the initial populations many inversions or other recombination modifiers.
 ## Burn In
 These initial populations can be created with the scripts:
- - ScriptNeutralInversion_DefineInitialState_XY_ModForSlim4.3.slim #Basic simulation (Figures 2,3, S2-3, S10-13)
- - ScriptNeutralInversion_DefineInitialState_HaploDiplo_SingleChrom.slim #Simulation with HaploDiplontic life cycle 
- - ScriptNeutralInversion_DefineInitialState_TwoChromFus.slim #Simulation of chromosome fusion (Figure S18)
- - ScriptNeutralInversion_DefineInitialState_XY_Variable_sh.slim #Simulation with mutation of variable h and s (drawn from distribution)
+ - ScriptNeutralInversion_DefineInitialState_XY_ModForSlim4.3.slim #Basic simulation (Figures 2,3, S2-3, S10-13); From Jay et al. 2022
+ - ScriptNeutralInversion_DefineInitialState_HaploDiplo_SingleChrom.slim #Simulation with HaploDiplontic life cycle ; From Jay et al. 2022
+ - ScriptNeutralInversion_DefineInitialState_TwoChromFus.slim #Simulation of chromosome fusion (Figure S18); From Jay et al. 2022
+ - ScriptNeutralInversion_DefineInitialState_XY_Variable_sh.slim #Simulation with mutation of variable h and s (drawn from distribution); From Jay et al. 2022
  - ScriptNeutralInversion_DefineInitialState.slim #Simulation of populations with non-XY system but with two mating types (all individuals are always heterozygous) (Figure S14)
+ - ScriptNeutralInversion_DefineInitialStateAutosome.slim # Script used for the new simulations (Figure 4) for the autosomes and in case of a distribution of dominance effect with fully recessive mutations
+ - ScriptNeutralInversion_DefineInitialStateAutosome_NoFullRecess.slim # Script used for the new simulations (Figure 4) for the autosomes and in case of a distribution of dominance effect without fully recessive mutations
+ - ScriptNeutralInversion_DefineInitialStateSexChrom.slim # Script used for the new simulations (Figure 4) for the Y chromosome and in case of a distribution of dominance effect with fully recessive mutations
+ - ScriptNeutralInversion_DefineInitialStateSexChrom_NoFullRecess.slim # Script used for the new simulations (Figure 4) for the Y chromosome and in case of a distribution of dominance effect without fully recessive mutations
 
-Basic usage of the "DefineInitialState" script:
+Basic usage of the "DefineInitialState" scripts from Jay et al. 2022:
 >slim -d N=1000 -d s=-0.01 -d h=0.1 -d r=1e-08 -d mu=1.45e-8 ScriptNeutralInversion_DefineInitialState_XY.slim #Perform a single simulation  
 parallel -j10 slim -d N=1000 -d mu=1e-8 -d h={1} -d s={2} -d r=1e-6 ScriptNeutralInversion_DefineInitialState_XY.slim ::: 0 0.001 0.005 0.01 0.05 0.1 0.5 ::: -0.001 -0.005 -0.01 -0.05 -0.1 -0.6 #Perform multiple simulation in parallel on 10 cores with different *s* and *h*  
+
+Basic usage of the new "DefineInitialState" scripts:
+slim -d N=12500 -d s=-0.001 ScriptNeutralInversion_DefineInitialStateSexChrom_NoFullRecess.slim
+
 
 *mu* define the mutation rate, *r* the recombination rate, *s* the selection coefficient (fixed or the mean of the gamma distribution), *h* the dominance coefficient, *N* the population size
 
@@ -25,18 +33,26 @@ This writes the initial populations in a ../InitialState directory (must be crea
 
 ## Introduce inversions
 Then, we introduce in these initial populations 1000's of inversions or other recombination modifiers. To do so, use the scripts:
- - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_ModForSlim4.3.slim #Basic simulation (Figures 3, S2-3, S10-13 )
- - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_SingleChrom_HaploDiplo.slim #Simulation with HaploDiplontic life cycle (Figures S22-23)
- - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_Variablesh.slim #Simulation with mutation of variable h and s (drawn from distribution, Figure S17)
- - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_ChromFus.slim #Simulation of chromosome fusion (Figure S18)
+ - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_ModForSlim4.3.slim #Basic simulation (Figures 3, S2-3, S10-13 ); From Jay et al. 2022
+ - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_SingleChrom_HaploDiplo.slim #Simulation with HaploDiplontic life cycle (Figures S22-23); From Jay et al. 2022
+ - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_Variablesh.slim #Simulation with mutation of variable h and s (drawn from distribution, Figure S17); From Jay et al. 2022
+ - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_ChromFus.slim #Simulation of chromosome fusion (Figure S18); From Jay et al. 2022
  - Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_HomoHeteroRecombMod.slim #Simulation of populations with non-XY system but with two mating types (all individuals are always heterozygous) and the introduction of not inversion but recombination modifier suppresssing recombination whatever their genotype (Figure S14)
+ - Script_IntroInv_XY_Autosome.slim # Script used for the new simulations (Figure 4) for the autosomes and in case of a distribution of dominance effect with fully recessive mutations
+ - Script_IntroInv_XY_Autosome_NoFullRecess.slim # Script used for the new simulations (Figure 4) for the autosomes and in case of a distribution of dominance effect without fully recessive mutations
+ - Script_IntroInv_XY_Sex.slim # Script used for the new simulations (Figure 4) for the Y chromosome and in case of a distribution of dominance effect with fully recessive mutations
+ - Script_IntroInv_XY_Sex_NoFullRecess.slim # Script used for the new simulations (Figure 4) for the Y chromosome and in case of a distribution of dominance effect without fully recessive mutations
 
-Basic usage of the "IntroduceInversionFromInitStat" scripts :
+Basic usage of the "IntroduceInversionFromInitStat" scripts from Jay et al. 2022:
  > slim -d N=1000 -d mu=1e-08 -d h=0.01 -d s=-0.01 -d r=1e-5 -d rep=1 -d start=1 -d end=2000000 -d "Init='../InitialState/slim_g15000_N=1000_r=1e-05_u=1e-08_s=-0.01_h=0.01_1635828730194.txt'" -d "SexChrom='Y'" Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY.slim #Introduction of a single 2000000 bp inversion on the Y chromosome in a initial population. Rep is only used to annotate the simulation (simunation number "Rep"). 
 
 The position of the inversion is defined with *start* and *end*. To mimick chromosome fusion, just consider start and end spanning the gap between the two chromosome, *i.e.* the position 10Mb (*e.g. start=7000000, end=11000000)
 
-To introduce 1000's of inversion in population with different parameters, use (and adapt) the script ParalleleWhileLoop_IndivSimulPlot_NMut_XY.sh:
+Basic usage of the new "IntroInv_XY" script:
+ > slim -d N=12500 -d s=-0.001 -d sInv=0.01 -d Rep=1 -d start=400000 -d end=6000000 -d "Init='../InitialState/slim_g200000_XYsyst_5M_Autosome_N12500_r1e-8_u1e-08_s-0.001_hmean0.2_Rep1_06687762978.txt'" Script_IntroInv_XY_Autosome.slim
+
+
+To introduce 1000's of inversion in population with different parameters, use (and adapt) the script ParalleleWhileLoop_IndivSimulPlot_NMut_XY.sh (or Parallele_IntroInv_XY*.sh scripts, for the new simulations):
  > source ParalleleWhileLoop_IndivSimulPlot_NMut_XY.sh  
   export -f slimFc  
   parallel -j30 slimFc ::: 1e-08 ::: 0.5 ::: -0.005 -0.001 -0.01 -0.05 -0.1 ::: {1..10000} ::: 5000000 15000000 ::: 500000 2000000 1000000 5000000 ::: Y X ## Run on 30 cores, 10000 inversion per parameter combinations are simulated, with one h and five possible s, inversions of 4 different sizes are considered, either on a X-bearing genome or in a Y-bearing genome, and either in the sex-chromosome (Mid position of the inversion at 5000000) or in the autosome (Mid position of the inversion at 15000000) #It automatically detect the right initial population to use, if it exists.  
