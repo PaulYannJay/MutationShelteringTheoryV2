@@ -31,7 +31,9 @@ Other simulation 'burn-in' scripts are used for other simulations:
 ## Introduce inversions
 Then, we introduce in these initial populations 1000's of inversions or other recombination modifiers. To do so, use the snakemake script:
  - SnakeMakeSlimSimulationV5 --jobs 20 --configfile ParamFile_Distrib.yaml --config outputDir="Output/" initDir="InitialState/
+
  The "ParamFile_Distrib.yaml" file indicates the range of parameters to be simulated (see ParamFile_Distrib.yaml for an example) and the number of inversion to be simulated.
+
  This script run "Script_IntroInv_XY_AllChrom_AllH_SingleRepV2.slim", which allow to perform most simulations.
 
 Other (older) script from Jay et al. 2022 allow to perform others type of simulations
