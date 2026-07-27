@@ -1,0 +1,44 @@
+// set up a simple neutral simulation
+initialize() {
+	// set the overall mutation rate
+	initializeMutationRate(mu);
+	// m1 mutation type: neutral
+	initializeMutationType("m1", h, "f", s);
+	initializeMutationType("m2", 0.5, "f", 0);// mutation defining mating type locus 1
+	initializeMutationType("m4", 0.5, "f", 0);// mutation defining inversion 1
+
+	// g1 genomic element type: uses m1 for all mutations
+	initializeGenomicElementType("g1", m1, 1.0);
+
+	// uniform chromosome of length 2000 kb for two chromosome
+	initializeGenomicElement(g1, 0,19999999);
+
+
+	// uniform recombination along two chromosomes
+	rates=c(r, 0.5, r);//Two chromosomes with R=1e-8	
+    ends=c(9999999,10000000,19999999); //Two chromosome of size 1000000	
+	initializeRecombinationRate(rates, ends);
+}
+// create a population of 500 individuals
+1 {
+	sim.addSubpop("p1", N);
+	defineConstant("simID", getSeed());
+}
+
+1 late() { //using late() just to avoid drift the first generation
+	sim.subpopulations.individuals.genome1.addNewDrawnMutation(m2, 5000000); // Introduce in this population the sex mutation at locus 1. 
+}
+
+2:15000	modifyChild(p1) { //simulating the meeting between two gamete and fecondation depand on their genotype
+	Gamete1MT1 = childGenome2.mutationsOfType(m2); //Checking the MT of the 1 gamete for the locus 1
+	Gamete2MT1 = childGenome1.mutationsOfType(m2); //Checking the MT of the 2 gamete for the locus 1
+	if (identical(Gamete1MT1, Gamete2MT1)){ //check the difference a the first locus
+			return F;} 
+	return T;
+}
+
+15000 late() {
+sim.outputFull("../InitialState/slim_g15000_MidSDR_10MChrom_N=" + N + "_r=" + r + "_u=" + mu + "_s=" + s + "_h=" + h + "_" + simID + ".txt");
+sim.simulationFinished();
+}
+

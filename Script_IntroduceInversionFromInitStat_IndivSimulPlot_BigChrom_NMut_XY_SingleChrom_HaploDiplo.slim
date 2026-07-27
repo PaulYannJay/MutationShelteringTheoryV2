@@ -1,0 +1,204 @@
+// set up a simple neutral simulation
+initialize() {
+	// set the overall mutation rate
+	initializeMutationRate(mu);
+	// m1 mutation type: neutral
+	initializeMutationType("m1", h, "f", s);
+	initializeMutationType("m2", 0.5, "f", 0);// mutation defining mating type locus 1
+	initializeMutationType("m3", 0.5, "f", 0);// mutation defining genome 2
+	initializeMutationType("m4", 0.5, "f", 0);// mutation defining inversion 1
+
+	// g1 genomic element type: uses m1 for all mutations
+	initializeGenomicElementType("g1", m1, 1.0);
+
+	// uniform chromosome of length 2000 kb for two chromosome
+	initializeGenomicElement(g1, 0,9999999);
+
+
+	// uniform recombination along two chromosomes
+	rates=c(r);//Two chromosomes with R=1e-8	
+    ends=c(9999999); //Two chromosome of size 1000000	
+	initializeRecombinationRate(rates, ends);
+}
+
+
+fitness(m1) {
+if (sim.generation % MutHaplo == 0)
+	{
+	return 1.0 + mut.selectionCoeff; //whatever the dominance coefficient, it is alway 1 every 2 generation (during the haploid phase)
+	}
+else
+	{
+	return relFitness;
+	}
+}
+
+15000 {
+	defineConstant("pos",start+integerDiv(end-start,2)); //Pos, the position of the inversion marker, must be an integer. Here, I use integerDiv to calculate the middle of the position of the inversion and define it as an integer
+	defineConstant("sizeInv",end-start+1); //The size of the inversion : used for output printing
+}
+
+15000 late() { //using late() just to avoid drift the first generation
+	sim.readFromPopulationFile(Init);
+	// start a newly seeded run
+	setSeed(rdunif(1, 0, asInteger(2^62) - 1));
+	sample(p1.genomes, 1).addNewDrawnMutation(m4, pos); //introduce a new inversion
+//   	YChromBool=p1.genomes.containsMarkerMutation(m2,5000000);//vector of boolean depending on whether genome that contain the inversion
+//    if ( SexChrom == "Y")
+//    { Chrom=p1.genomes[YChromBool];}//vector of boolean depending on whether genome that contain the inversion
+//    else
+//    {Chrom=p1.genomes[!YChromBool];}
+//	sample(Chrom, 1).addNewDrawnMutation(m4, pos); //introduce a new inversion
+	}
+
+15001:25000 early() { //record inversion frequency 
+if (sim.generation % MutHaplo == 0)
+	{
+	sim.subpopulations.individuals.genome2.removeMutations(sim.subpopulations.individuals.genome2.mutationsOfType(m1)); // remove all mutation of genome 2 : a simple way to set the fitness effect of genome 2 = 0
+	sim.subpopulations.individuals.genome2.addNewDrawnMutation(m3, 1); //Add a marker mutation to recognise genome 2. Because not gamete from genome 2 are used, this mutation disapear every generations
+	}
+	if (sim.generation % 10 == 1) //every 30 generation
+		{
+		file=paste(c("../Output/N=",N,"_Inv=",start, "-", end, "_r=", r, "_u=",mu ,"_h=",h,"_s=",s,"_FreqHaplo=", MutHaplo,"IntroduceInvFromInit_Nmut_Freq_IndivPlot_HaploDiplo_SingleChrom.txt"), sep="");
+		mut4 = sim.mutationsOfType(m4);//inversion marker
+		mut2 = sim.mutationsOfType(m2);//inversion marker
+		if (size (mut4) != 1) //No more inversion in the dataset (Fixed or Lost)
+		{
+			sim.simulationFinished(); // The simulaten end when their is no more inversion segregating
+		}
+		else
+		{
+		VecMut=p1.genomes.containsMarkerMutation(m4,pos);//vector of boolean depending on whether genome that contain the inversion
+		genomeWInv=p1.genomes[VecMut]; // genome with inversion
+		genomeNoInv=p1.genomes[!VecMut];//genome without inversion
+		//genome no Inv
+		NMutNoInvvec=c(); //vector containg the number of mutation in indiv without inversion
+		FreqMutNoInvvec=c(); //meab frequency of these mutation
+		for (g in genomeNoInv) { //For all genome without the inversion
+			posMut = g.mutationsOfType(m1).position; //position of mutation in this genome
+			NbMut=sum((posMut >= start) & (posMut < end)); //Number of mutation in the inversion region
+			NMutNoInvvec=c(NMutNoInvvec, NbMut); //put in a vector
+			MutNoInvBool=((posMut >= start) & (posMut < end)); 
+    		MutNoInv=g.mutationsOfType(m1)[MutNoInvBool];
+    		MutNoInvFreq=mean(sim.mutationFrequencies(NULL, MutNoInv)); //Mean frequency of mutation in the inversion
+			FreqMutNoInvvec=c(FreqMutNoInvvec, MutNoInvFreq); //put in a vector
+			}
+		meanNbMutNoInv=mean(NMutNoInvvec); //mean number of mutation
+		sdNbMutNoInv=sd(NMutNoInvvec); // sd
+		maxNbMutNoInv=max(NMutNoInvvec); //max
+		minNbMutNoInv=min(NMutNoInvvec); //min
+		if( size(FreqMutNoInvvec)>0)
+			{
+			meanFreqMutNoInv=mean(FreqMutNoInvvec);
+			}
+		else
+			{
+			meanFreqMutNoInv="NA";
+			}
+		// genome W Inv
+		NMutWInvvec=c();
+		FreqMutWInvvec=c();
+		for (g in genomeWInv) { //For all genome without the inversion
+			posMut = g.mutationsOfType(m1).position; //position of mutation in this genome
+			NbMut=sum((posMut >= start) & (posMut < end)); //Number of mutation in the inversion region
+			NMutWInvvec=c(NMutWInvvec, NbMut); //put in a vector
+			MutWInvBool=((posMut >= start) & (posMut < end));
+    		MutWInv=g.mutationsOfType(m1)[MutWInvBool];
+    		MutWInvFreq=mean(sim.mutationFrequencies(NULL, MutWInv)); //Mean frequency of mutation in the inversion
+			FreqMutWInvvec=c(FreqMutWInvvec, MutWInvFreq); //put in a vector
+			}
+		meanNbMutWInv=mean(NMutWInvvec);
+		if (size(NMutWInvvec) > 1)
+		{ sdNbMutWInv=sd(NMutWInvvec);}
+		else
+		{sdNbMutWInv=0;}
+		maxNbMutWInv=max(NMutWInvvec);
+		minNbMutWInv=min(NMutWInvvec);
+		if( size(FreqMutWInvvec)>0)
+			{
+			meanFreqMutWInv=mean(FreqMutWInvvec);
+			}
+		else
+			{
+			meanFreqMutWInv="NA";
+			}
+    	meanFitnessInv=mean(p1.cachedFitness(genomeWInv.individual.index)); //Mean Fitness of sample with inversion
+    	meanFitnessNoInv=mean(p1.cachedFitness(genomeNoInv.individual.index));//Mean Fitness of sample without inversion
+		Freq4=sim.mutationFrequencies(NULL, mut4);
+		Freq2=sim.mutationFrequencies(NULL, mut2);
+//		catn("InvFreq=" + Freq4);
+//		catn("MatFreq=" + Freq2);
+		line=paste(c(N,"\t", mu,"\t",r,"\t",h,"\t",s,"\t",sim.generation,"\t",start,"\t",end,"\t",MutHaplo,"\t",rep,"\t",meanNbMutWInv, "\t",minNbMutWInv, "\t",maxNbMutWInv, "\t",sdNbMutWInv, "\t",meanFreqMutWInv,"\t",meanNbMutNoInv, "\t",minNbMutNoInv, "\t",maxNbMutNoInv, "\t",sdNbMutNoInv, "\t",meanFreqMutNoInv,"\t",meanFitnessInv, "\t", meanFitnessNoInv,"\t", Freq4)); //output the frequency of a given mutation
+		writeFile(file, line, append=T);
+		}
+	}
+}
+
+15000:25000	modifyChild(p1) { //simulating the meeting between two gamete and fecondation depand on their genotype
+if (sim.generation % MutHaplo == 0) //Mating during the haploid phase is only allowed between genome 1 (the genome 2 is inactive during the haploid phase) and if they have different mating type. During the diploid phase, the child generation generate haploid individual (individual for whome the second genome is inactive). Thus, we do not care about the mating type of these mating genomes. 
+	{
+	Gamete1MT = childGenome1.containsMarkerMutation(m2, 5000000); //Checking the MT of the 1 gamete for the locus 1
+	//catn(Gamete1MT);
+	Gamete2MT = childGenome2.containsMarkerMutation(m2, 5000000); //Checking the MT of the 1 gamete for the locus 1
+	//catn(Gamete2MT);
+	if (identical(Gamete1MT, Gamete2MT)){ //check the difference a the first locus
+//			catn("Not OK" + "\n");
+			return F;} //No mating between game with the same MT
+	else
+		{
+	//	catn("OK");
+		if (childGenome2.containsMarkerMutation(m3, 1) == T | childGenome1.containsMarkerMutation(m3, 1) == T){ //all mating between gamete coming from genome 2 are removed)
+			//catn("Genome2 : bug" + "\n");
+			return F;} 
+		else {
+			//catn("Genome1 : Ok" + "\n");
+			return T;
+			}
+		}
+	}
+	else
+	{
+		Gamete1MT = childGenome1.containsMarkerMutation(m2, 5000000); //Checking the MT of the 1 gamete for the locus 1
+		//catn(Gamete1MT);
+		Gamete2MT = childGenome2.containsMarkerMutation(m2, 5000000); //Checking the MT of the 1 gamete for the locus 1
+		//catn(Gamete2MT);
+		if (identical(Gamete1MT, Gamete2MT)){ //check the difference a the first locus
+//				catn("Not OK" + "\n");
+				return F;} //No mating between game with the same MT
+		else
+		{
+		return T;
+		}
+	}	
+}
+
+25000 late() {
+	sim.simulationFinished();
+}
+
+recombination() { //Define special recombination pattern depending on mutation (inversion) presence
+	if (sim.generation % MutHaplo == 0) //No recombination between the two genome during the haploid phase : the genome 2 is inactive
+	{
+		breakpoints=c(9999999);//Remove all breakpoints
+		return T;
+	}
+	else
+	{
+		if (genome1.containsMarkerMutation(m4, pos) == genome2.containsMarkerMutation(m4, pos)) //if the mutation associated with inversion is found in the two genome
+		//if (genome1.containsMarkerMutation(m4, 200000) == genome2.containsMarkerMutation(m4, 200000)) //if the mutation associated with inversion is found in the two genome
+		{
+			return F;
+		} //Nothing happens
+		else
+		{ 
+			//inInv = (breakpoints > 1) & (breakpoints < 500000); //Define breakpoint of inversion
+			inInv = (breakpoints > start) & (breakpoints < end); //Define breakpoint of inversion
+			if (!any(inInv)) //If no recombination breakpoint fall in the inversion breakpoint, 
+				{return F;} // Nothing happens
+			else 
+				{breakpoints = breakpoints[!inInv]; //If not, this recombination can't occur
+				return T;
+				}
+		}
+	}
+}

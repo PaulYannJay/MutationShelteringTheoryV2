@@ -1,0 +1,163 @@
+// set up a simple neutral simulation
+initialize() {
+	// set the overall mutation rate
+	initializeMutationRate(mu);
+	// m1 mutation type: neutral
+	initializeMutationType("m1", h, "f", s);
+	initializeMutationType("m2", 0.5, "f", 0);// mutation defining mating type locus 1
+	initializeMutationType("m4", 0.5, "f", 0);// mutation defining inversion 1
+
+	// g1 genomic element type: uses m1 for all mutations
+	initializeGenomicElementType("g1", m1, 1.0);
+
+	// uniform chromosome of length 2000 kb for two chromosome
+	initializeGenomicElement(g1, 0,19999999);
+
+
+	// uniform recombination along two chromosomes
+	rates=c(r, 0.5, r);//Two chromosomes with R=1e-8	
+    ends=c(9999999,10000000,19999999); //Two chromosome of size 10000000	
+	initializeRecombinationRate(rates, ends);
+	initializeSex("A");
+}
+
+15000 {
+	defineConstant("pos",start+integerDiv(end-start,2)); //Pos, the position of the inversion marker, must be an integer. Here, I use integerDiv to calculate the middle of the position of the inversion and define it as an integer
+	catn(pos);
+	defineConstant("sizeInv",end-start+1); //The size of the inversion : used for output printing
+}
+
+15000 late() { //using late() just to avoid drift the first generation
+	sim.readFromPopulationFile(Init);
+	// start a newly seeded run
+	setSeed(rdunif(1, 0, asInteger(2^62) - 1));
+   	YChromBool=p1.genomes.containsMarkerMutation(m2,5000000);//vector of boolean depending on whether genome that contain the inversion
+    if ( SexChrom == "Y")
+    { 
+	catn("sisi");
+	Chrom=p1.genomes[YChromBool];}//vector of boolean depending on whether genome that contain the inversion
+    else
+    {Chrom=p1.genomes[!YChromBool];}
+	sample(Chrom, 1).addNewDrawnMutation(m4, pos); //introduce a new inversion
+	}
+
+15000:25000	modifyChild(p1) { //simulating the meeting between two gamete and fecondation depand on their genotype
+	numY = sum(child.genomes.containsMarkerMutation(m2, 5000000));
+	// no individual should have more than one Y
+	if (numY > 1)
+		stop("### ERROR: got too many Ys");
+	// females should have 0 Y's
+	if (child.sex == "F" & numY > 0)
+		return F;
+	// males should have 1 Y
+	if (child.sex == "M" & numY == 0)
+		return F;
+	return T;
+}
+
+15001:25000 early() { //record inversion frequency 
+	if (sim.generation % 10 == 1) //every 30 generation
+		{
+		file=paste(c("../Output/N=",N,"_Inv=",start, "-", end, "_r=", r, "_u=",mu ,"_h=",h,"_s=",s,"IntroduceInvFromInit_Nmut_Freq_IndivPlot_ChromFus.txt"), sep="");
+		mut4 = sim.mutationsOfType(m4);//inversion marker
+		mut2 = sim.mutationsOfType(m2);//inversion marker
+		if (size (mut4) != 1) //No more inversion in the dataset (Fixed or Lost)
+		{
+			sim.simulationFinished(); // The simulaten end when their is no more inversion segregating
+		}
+		else
+		{
+		VecMut=p1.genomes.containsMarkerMutation(m4,pos);//vector of boolean depending on whether genome that contain the inversion
+		genomeWInv=p1.genomes[VecMut]; // genome with inversion
+		genomeNoInv=p1.genomes[!VecMut];//genome without inversion
+		//genome no Inv
+		NMutNoInvvec=c(); //vector containg the number of mutation in indiv without inversion
+		FreqMutNoInvvec=c(); //meab frequency of these mutation
+		for (g in genomeNoInv) { //For all genome without the inversion
+			posMut = g.mutationsOfType(m1).position; //position of mutation in this genome
+			NbMut=sum((posMut >= start) & (posMut < end)); //Number of mutation in the inversion region
+			NMutNoInvvec=c(NMutNoInvvec, NbMut); //put in a vector
+			MutNoInvBool=((posMut >= start) & (posMut < end)); 
+    		MutNoInv=g.mutationsOfType(m1)[MutNoInvBool];
+    		MutNoInvFreq=mean(sim.mutationFrequencies(NULL, MutNoInv)); //Mean frequency of mutation in the inversion
+			FreqMutNoInvvec=c(FreqMutNoInvvec, MutNoInvFreq); //put in a vector
+			}
+		meanNbMutNoInv=mean(NMutNoInvvec); //mean number of mutation in non-inverted segments
+		sdNbMutNoInv=sd(NMutNoInvvec); // sd
+		maxNbMutNoInv=max(NMutNoInvvec); //max
+		minNbMutNoInv=min(NMutNoInvvec); //min
+		if( size(FreqMutNoInvvec)>0)
+			{
+			meanFreqMutNoInv=mean(FreqMutNoInvvec);
+			}
+		else
+			{
+			meanFreqMutNoInv="NA";
+			}
+		// genome W Inv
+		NMutWInvvec=c();
+		FreqMutWInvvec=c();
+		for (g in genomeWInv) { //For all genomes with the inversion
+			posMut = g.mutationsOfType(m1).position; //position of mutation in this genome
+			NbMut=sum((posMut >= start) & (posMut < end)); //Number of mutation in the inversion region
+			NMutWInvvec=c(NMutWInvvec, NbMut); //put in a vector
+			MutWInvBool=((posMut >= start) & (posMut < end));
+    		MutWInv=g.mutationsOfType(m1)[MutWInvBool];
+    		MutWInvFreq=mean(sim.mutationFrequencies(NULL, MutWInv)); //Mean frequency of mutation in the inversion
+			FreqMutWInvvec=c(FreqMutWInvvec, MutWInvFreq); //put in a vector
+			}
+		meanNbMutWInv=mean(NMutWInvvec); //Mean number of mutations in inversions
+		if (size(NMutWInvvec) > 1)
+		{ sdNbMutWInv=sd(NMutWInvvec);}
+		else
+		{sdNbMutWInv=0;}
+		maxNbMutWInv=max(NMutWInvvec);
+		minNbMutWInv=min(NMutWInvvec);
+		if( size(FreqMutWInvvec)>0)
+			{
+			meanFreqMutWInv=mean(FreqMutWInvvec);
+			}
+		else
+			{
+			meanFreqMutWInv="NA";
+			}
+    	meanFitnessInv=mean(p1.cachedFitness(genomeWInv.individual.index)); //Mean Fitness of sample with inversion
+    	meanFitnessNoInv=mean(p1.cachedFitness(genomeNoInv.individual.index));//Mean Fitness of sample without inversion
+		Freq4=sim.mutationFrequencies(NULL, mut4);
+		Freq2=sim.mutationFrequencies(NULL, mut2);
+		catn(Freq4);
+		catn(Freq2);
+		line=paste(c(N,"\t", mu,"\t",r,"\t",h,"\t",s,"\t",sim.generation,"\t",start,"\t",end,"\t",rep,"\t",meanNbMutWInv, "\t",minNbMutWInv, "\t",maxNbMutWInv, "\t",sdNbMutWInv, "\t",meanFreqMutWInv,"\t",meanNbMutNoInv, "\t",minNbMutNoInv, "\t",maxNbMutNoInv, "\t",sdNbMutNoInv, "\t",meanFreqMutNoInv,"\t",meanFitnessInv, "\t", meanFitnessNoInv,"\t", Freq4, "\t", SexChrom)); //output the frequency of a given mutation
+		writeFile(file, line, append=T);
+		}
+	}
+}
+
+25000 late() {
+	sim.simulationFinished();
+}
+
+recombination() { //Define special recombination pattern depending on mutation (inversion) presence and sex-chromosome genotype
+	Bool=1;
+	if (genome1.containsMarkerMutation(m2, 5000000) != genome2.containsMarkerMutation(m2, 5000000)) //XY individual
+		{ 
+		inInv = (breakpoints > 1000000) & (breakpoints < 9000000); // No recombination between position 1-9Mb (mimicking old sex chrom
+		if (any(inInv)) //If a recombination fall in the non-recombining region, 
+			{breakpoints = breakpoints[!inInv]; //This recombination can't occur
+			Bool=0;
+			}
+		}
+	if (genome1.containsMarkerMutation(m4, pos) != genome2.containsMarkerMutation(m4, pos)) //if the mutation associated with inversion is found in the two genome
+		{ 
+		inInv = (breakpoints > start) & (breakpoints < end); //Define breakpoint of inversion
+		if (any(inInv)) //If a recombination breakpoint fall in the inversion breakpoint, 
+			{breakpoints = breakpoints[!inInv]; //This recombination can't occur
+			Bool=0;
+			}
+		}
+	if (Bool == 0)
+		{return T;}
+	else
+		{return F;}
+	}
+

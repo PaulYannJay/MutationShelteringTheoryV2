@@ -1,0 +1,99 @@
+// set up a simple neutral simulation
+initialize() {
+	// set the overall mutation rate
+	initializeMutationRate(mu);
+	// m1 mutation type: neutral
+	initializeMutationType("m10", 0, "g", s, 0.2); //mutation sampled among a gamma distribution and with various h
+	initializeMutationType("m11", 0.01, "g", s, 0.2);
+	initializeMutationType("m12", 0.1, "g", s, 0.2);
+	initializeMutationType("m13", 0.2, "g", s, 0.2);
+	initializeMutationType("m14", 0.3, "g", s, 0.2);
+	initializeMutationType("m15", 0.4, "g", s, 0.2);
+	initializeMutationType("m16", 0.5, "g", s, 0.2);
+	initializeMutationType("m2", 0.5, "f", 0);// mutation defining mating type locus 1
+	initializeMutationType("m4", 0.5, "f", 0);// mutation defining inversion 1
+
+	// g1 genomic element type: uses m1 for all mutations
+	initializeGenomicElementType("g1", c(m10,m11,m12,m13,m14,m15,m16),c(1,1,1,1,1,1,1)); //mutation with different dominance appear with equal probability
+
+	// uniform chromosome of length 2000 kb for two chromosome
+	initializeGenomicElement(g1, 0,19999999);
+
+
+	// uniform recombination along two chromosomes
+	rates=c(r, 0.5, r);//Two chromosomes with R=1e-8	
+    ends=c(9999999,10000000,19999999); //Two chromosome of size 1000000	
+	initializeRecombinationRate(rates, ends);
+	initializeSex("A");
+}
+// create a population of 500 individuals
+1 late(){
+	sim.addSubpop("p1", N);
+	defineConstant("simID", getSeed());
+	i = p1.individuals;
+	i[i.sex == "M"].genome2.addNewDrawnMutation(m2, 5000000);
+}
+
+2:15000	modifyChild(p1) { //simulating the meeting between two gamete and fecondation depand on their genotype
+	numY = sum(child.genomes.containsMarkerMutation(m2, 5000000));
+	// no individual should have more than one Y
+	if (numY > 1)
+		stop("### ERROR: got too many Ys");
+	// females should have 0 Y's
+	if (child.sex == "F" & numY > 0)
+		return F;
+	// males should have 1 Y
+	if (child.sex == "M" & numY == 0)
+		return F;
+	return T;
+}
+
+1:15000 late(){
+	if (sim.generation % 100 == 0)
+		{
+		Genomes=p1.genomes; // All genomes
+		NMutVec=c();
+		NMutVec_AroundMT=c();
+		for (g in Genomes) {
+			NbMut1=g.countOfMutationsOfType(m10);
+			NbMut2=g.countOfMutationsOfType(m11);
+			NbMut3=g.countOfMutationsOfType(m12);
+			NbMut4=g.countOfMutationsOfType(m13);
+			NbMut5=g.countOfMutationsOfType(m14);
+			NbMut6=g.countOfMutationsOfType(m15);
+			NbMut7=g.countOfMutationsOfType(m16);
+			NbMut=NbMut1+NbMut2+NbMut3+NbMut4+NbMut5+NbMut6+NbMut7;
+			NMutVec=c(NMutVec, NbMut);
+			}
+		meanNbMut=mean(NMutVec); //Mean number of mutations in genomes
+		Mut1=sim.mutationsOfType(m10);
+		Mut2=sim.mutationsOfType(m11);
+		Mut3=sim.mutationsOfType(m12);
+		Mut4=sim.mutationsOfType(m13);
+		Mut5=sim.mutationsOfType(m14);
+		Mut6=sim.mutationsOfType(m15);
+		Mut7=sim.mutationsOfType(m16);
+		mut = c(Mut1,Mut2,Mut3,Mut4,Mut5,Mut6,Mut7);
+		NbMut1=sim.countOfMutationsOfType(m10);
+		NbMut2=sim.countOfMutationsOfType(m11);
+		NbMut3=sim.countOfMutationsOfType(m12);
+		NbMut4=sim.countOfMutationsOfType(m13);
+		NbMut5=sim.countOfMutationsOfType(m14);
+		NbMut6=sim.countOfMutationsOfType(m15);
+		NbMut7=sim.countOfMutationsOfType(m16);
+		Nmut=NbMut1+NbMut2+NbMut3+NbMut4+NbMut5+NbMut6+NbMut7; //Total number of mutation
+		Freq1=sim.mutationFrequencies(NULL, mut);
+		MeanFreq1=mean(Freq1); //Mean frequency of mutatios
+		MutXY=mut[(mut.position >= 4975000) & (mut.position < 5250000)];
+		NbMutXY=size(MutXY);
+		FreqMutXY=mean(sim.mutationFrequencies(NULL, MutXY));
+		line=paste(c(N,"\t", mu,"\t",r,"\t",s,"\t",sim.generation,"\t", meanNbMut,"\t", Nmut, "\t", MeanFreq1, "\t", NbMutXY, "\t", FreqMutXY)); //output the frequency of a given mutation
+		writeFile(paste(c("../InitialState/slim_g15000_MidSDR_10MChrom_XY_N=" , N , "_r=" , r , "_u=" , mu , "_Lambs=" , s , "_h=variable", "_" , simID , "_Stat.txt"), sep=""), line, append=T);
+		}	
+}
+
+15000 late() {
+sim.outputFull("../InitialState/slim_g15000_MidSDR_10MChrom_XY_N=" + N + "_r=" + r + "_u=" + mu + "_Lambs=" + s + "_h=variable"+ "_" + simID + ".txt");
+sim.simulationFinished();
+}
+
