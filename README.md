@@ -97,10 +97,10 @@ Older scripts from Jay et al. 2022 handle other simulation types:
 
 | Script | Description |
 |--------|-------------|
-| `Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_SingleChrom_HaploDiplo.slim` | Haplodiplontic life cycle (Figures S22–23) |
-| `Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_Variablesh.slim` | Variable *h* and *s*, drawn from a distribution (Figure S17) |
-| `Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_ChromFus.slim` | Chromosome fusion (Figure S18) |
-| `Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_HomoHeteroRecombMod.slim` | Non-XY system with two mating types; introduces recombination modifiers (rather than inversions) that suppress recombination regardless of genotype (Figure S14) |
+| `Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_SingleChrom_HaploDiplo.slim` | Haplodiplontic life cycle (Figures S11) |
+| `Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_Variablesh.slim` | Variable *h* and *s*, drawn from a distribution (Figure 4 and S10) |
+| `Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_NMut_XY_ChromFus.slim` | Chromosome fusion (Figure S12) |
+| `Script_IntroduceInversionFromInitStat_IndivSimulPlot_BigChrom_HomoHeteroRecombMod.slim` | Non-XY system with two mating types; introduces recombination modifiers (rather than inversions) that suppress recombination regardless of genotype (Figure S8) |
 
 **Basic usage of the "IntroduceInversionFromInitStat" scripts (Jay et al. 2022):**
 
@@ -138,7 +138,7 @@ cat IntroInv_XYsyst_5M_*N1* > IntroInv_XYsyst_5M_AllParam_All50000Rep_Stat_Full.
 
 ## 2. Analyses of the formation of sex chromosomes
 
-*(Figures 5, 6, S24)*
+*(Figures 5, 6, S13)*
 
 Run `ScriptFormationXYChromosome_VarGamma_OnlyXY_Revers_Optimized.slim` directly with the desired parameters, for example:
 
