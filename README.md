@@ -15,7 +15,7 @@ Simulations were performed with [SLiM](https://messerlab.org/slim/), and fall in
 1. **Analyses of the fate of many inversions** (Figures 3, S2–3, S10–19, S22–23, S25)
 2. **Analyses of the formation of sex chromosomes** (Figures 5, 6, S24)
 
-Deterministic simulations and additional figures were produced with R.
+Deterministic simulations and figures were produced with R.
 
 The original datasets from Jay et al. are available on figshare ([doi:10.6084/m9.figshare.19961033](https://doi.org/10.6084/m9.figshare.19961033)). The new datasets will be published upon publication of the manuscript; in the meantime, they are available upon request.
 
@@ -33,7 +33,7 @@ The original datasets from Jay et al. are available on figshare ([doi:10.6084/m9
 
 ## 1. Analyses of the fate of many inversions
 
-*(Figures 3, S2–3, S10–19, S22–23, S25)*
+*(Figures 2c,3,4, S2–8,10–12,14)*
 
 The workflow has two steps: first, "burn-in" simulations create initial populations under various parameter combinations; then, many inversions (or other recombination modifiers) are introduced into these initial populations.
 
