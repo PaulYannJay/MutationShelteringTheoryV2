@@ -1,0 +1,82 @@
+// set up a simple neutral simulation
+initialize() {
+	// set the overall mutation rate
+	defineConstant("r", 1.2e-8);
+	defineConstant("mu", 1.2e-8);
+	defineConstant("Ne", N);
+	initializeMutationRate(mu);
+	// Mutation type // Rescaled for population 10 time smaller
+	initializeMutationType("m11", 0.1, "g", s, 0.2);
+	initializeMutationType("m12", 0.2, "g", s, 0.2);
+	initializeMutationType("m13", 0.3, "g", s, 0.2);
+	initializeMutationType("m14", 0.4, "g", s, 0.2);
+	initializeMutationType("m15", 0.5, "g", s, 0.2);
+	initializeMutationType("m2", 0.5, "f", 0);// mutation defining mating type locus 1
+	initializeMutationType("m4", 0.5, "f", 0);// mutation defining inversion 1
+	//initializeMutationType("m2", 0.5, "e", 0.01*RescaleFactor);
+	// g1 genomic element type: uses m1 for all mutations
+	//initializeGenomicElementType("g1", c(m10,m101,m11,m12,m13,m14,m15,m2), c(100,100,100,100,100,100,100,0.1));
+	initializeGenomicElementType("g1", c(m11,m12,m13,m14,m15), c(100,100,100,100,100));
+	
+
+
+	// uniform chromosome of length 2000 kb for two chromosome
+	initializeGenomicElement(g1, 0,4999999);
+
+
+	// uniform recombination along two chromosomes
+	rates=c(r);//Two chromosomes 
+    ends=c(4999999); //Two chromosome of size 2000000 and 1	
+	initializeRecombinationRate(rates, ends);
+	initializeSex("A");
+	defineConstant("simID", getSeed());
+	defineConstant("OutFileMut", "../InitialState/slim_g200000_XYsyst_5M_Autosome_N" + N + "_r1e-8_u1e-08_s" + s + "_NoFullRecess_Rep" + Rep +"_" + simID + "_MutFreq.txt");
+}
+
+// create a population of 12500 individuals
+1 late(){
+	sim.addSubpop("p1", Ne);
+	//defineConstant("simID", getSeed());
+//	i = p1.individuals;
+//	i[i.sex == "M"].genome2.addNewDrawnMutation(m2, 2000001);
+}
+
+//2:125000	modifyChild(p1) { //simulating the meeting between two gamete and fecondation depand on their genotype
+//	numY = sum(child.genomes.containsMarkerMutation(m2, 2000001));
+//	// no individual should have more than one Y
+//	if (numY > 1)
+//		stop("### ERROR: got too many Ys");
+//	// females should have 0 Y's
+//	if (child.sex == "F" & numY > 0)
+//		return F;
+//	// males should have 1 Y
+//	if (child.sex == "M" & numY == 0)
+//		return F;
+//	return T;
+//}
+
+1:200000 late(){
+	if (sim.cycle % 100 == 0) //print output every 100 generation
+		{
+		print(sim.cycle);
+		Genomes=p1.genomes; // All genomes 
+		NMutVec=c();
+		for (g in Genomes) {
+			NbMut=g.countOfMutationsOfType(m11);
+			NMutVec=c(NMutVec, NbMut);
+			}
+		meanNbMut=mean(NMutVec); //mean number of mutations in genomes
+		mut1 = sim.mutationsOfType(m11); 
+		Nmut1= sim.countOfMutationsOfType(m11); //Number of mutations segregating
+		Freq1=sim.mutationFrequencies(NULL, mut1); //mean frequency of mutations
+		MeanFreq1=mean(Freq1);
+		line=paste(c(N, mu,r,s,sim.cycle,"Autosome",Rep, meanNbMut, Nmut1,  MeanFreq1), sep="\t"); //output the frequency of a given mutation
+		writeFile(OutFileMut, line, append=T);
+		}	
+	}
+
+200000 late() {
+//200 late() {
+sim.outputFull("../InitialState/slim_g200000_XYsyst_5M_Autosome_N" + N + "_r1e-8_u1e-08_s" + s + "_NoFullRecess_Rep" + Rep+ "_"+ simID + ".txt");
+sim.simulationFinished();
+}

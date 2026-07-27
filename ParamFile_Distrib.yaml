@@ -1,0 +1,12 @@
+N: [10000]
+u: ["1.0e-08"]
+r: ["1.0e-07"]
+s: [-0.0001, -0.001, -0.01]
+h: [Distrib2]
+sInv: [0, 0.01]
+nRep: [50000]
+invSize: [5000000, 1000000]
+chromSize: 5000000
+Distrib: [NoDistrib]
+Chromosome: [SexChrom]
+slimInstall:  ~/Software/SLiM4.3/SLiM/build/slim

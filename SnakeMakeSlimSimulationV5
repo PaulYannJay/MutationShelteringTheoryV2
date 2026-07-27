@@ -1,0 +1,70 @@
+#SnakeFile#
+outputDir= config["outputDir"]
+initFileDir=config["initDir"]
+N_list = config["N"]
+h_list = config["h"]
+s_list = config["s"]
+u_list = config["u"]
+r_list = config["r"]
+sInv_list = config["sInv"]
+nRep_list = config["nRep"]
+invSize_list = config["invSize"]
+chromosome_list = config["Chromosome"]
+slimInstall=config["slimInstall"]
+chromosome_size = config["chromSize"]
+chromosome_sizeMb = int(chromosome_size/1000000)
+print(r_list)
+
+rule All:
+    input:
+        expand(outputDir + "IntroInv_XYsyst_{Size}M_{Chrom}_N{N}_r{r}_u{u}_s{s}_h{h}_sInv{sInv}_invSize{invSize}_All{NRep}Rep_Stat.txt", Chrom=chromosome_list, N=N_list, u=u_list, r=r_list, s=s_list, h=h_list, sInv=sInv_list, invSize=invSize_list,NRep=nRep_list, Size=chromosome_sizeMb) 
+
+
+rule PerformSimulation:
+    input:
+        InitFile= initFileDir + "slim_XYsyst_{Size}M_Autosome_N{N}_r{r}_u{u}_s{s}_h{h}_Rep1_Ref.txt"
+    output:
+        #Sim= temp(outputDir + "IntroInv_XYsyst_{Size}_{Chrom}_N{N}_r{r}_u{u}_s{s}_h{h}_sInv{sInv}_invSize{invSize}_AllRep/IntroInv_XYsyst_{Size}_SexChrom_N{N}_r{r}_u{u}_s{s}_h{h}_sInv{sInv}_invSize{invSize}_Rep{Rep}_Stat.txt")
+        Sim= temp(outputDir + "IntroInv_XYsyst_{Size}M_{Chrom}_N{N}_r{r}_u{u}_s{s}_h{h}_sInv{sInv}_invSize{invSize}_AllRep/IntroInv_XYsyst_{Size}M_{Chrom}_N{N}_r{r}_u{u}_s{s}_h{h}_sInv{sInv}_invSize{invSize}_Rep{Rep}_Stat.txt")
+
+    params: 
+        Dir= outputDir + "IntroInv_XYsyst_{Size}M_{Chrom}_N{N}_r{r}_u{u}_s{s}_h{h}_sInv{sInv}_invSize{invSize}_AllRep/",
+    shell:
+        """ if [[ "{wildcards.h}" =~ ^[+-]?[0-9]+([.][0-9]+)?$ ]]; then """ # Check if h is a number or a string (e.g. "Distrib1")
+        """ {config[slimInstall]} -d N={wildcards.N} -d s={wildcards.s} -d sInv={wildcards.sInv} -d Rep={wildcards.Rep} -d InvSize={wildcards.invSize} -d mu={wildcards.u} -d r={wildcards.r} -d h={wildcards.h} -d chromSize={config[chromSize]} -d "Init='{input.InitFile}'" -d "Chrom='{wildcards.Chrom}'" Script_IntroInv_XY_AllChrom_AllH_SingleRepV2.slim ; """
+        """ else {config[slimInstall]} -d N={wildcards.N} -d s={wildcards.s} -d sInv={wildcards.sInv} -d Rep={wildcards.Rep} -d InvSize={wildcards.invSize} -d mu={wildcards.u} -d r={wildcards.r} -d "h='{wildcards.h}'" -d chromSize={config[chromSize]} -d "Chrom='{wildcards.Chrom}'" -d "Init='{input.InitFile}'" Script_IntroInv_XY_AllChrom_AllH_SingleRepV2.slim ; fi"""
+
+
+def make_rep_inputs(w):
+    """
+    Return list of input files for NRep  based on output wildcards.
+    """
+    pattern = (
+        outputDir
+        + "IntroInv_XYsyst_{Size}M_{Chrom}_N{N}_r{r}_u{u}_s{s}_h{h}_sInv{sInv}_invSize{invSize}_AllRep/"
+        + "IntroInv_XYsyst_{Size}M_{Chrom}_N{N}_r{r}_u{u}_"
+        + "s{s}_h{h}_sInv{sInv}_invSize{invSize}_Rep{Rep}_Stat.txt"
+    )
+    return expand(
+        pattern,
+        Rep=range(1, int(w.NRep) + 1),   # Rep 0..10000
+        #Rep=range(1, 5),   # Rep 0..10000
+        Chrom=w.Chrom,
+        Size=w.Size,
+        N=w.N,
+        r=w.r,
+        u=w.u,
+        s=w.s,
+        h=w.h,
+        sInv=w.sInv,
+        invSize=w.invSize
+    )
+
+rule MergeSimulations:
+    input:
+        make_rep_inputs
+    output:
+        Sim= outputDir + "IntroInv_XYsyst_{Size}M_{Chrom}_N{N}_r{r}_u{u}_s{s}_h{h}_sInv{sInv}_invSize{invSize}_All{NRep}Rep_Stat.txt"
+    shell:
+        """ for i in {input} ; do cat $i >> {output} ; done"""
+        
